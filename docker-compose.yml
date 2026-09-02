@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: apisec_postgres
+    environment:
+      POSTGRES_DB: apisecurity_db
+      POSTGRES_USER: apisec_user
+      POSTGRES_PASSWORD: apisec_secure_password_123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U apisec_user -d apisecurity_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: apisec_backend
+    environment:
+      - DATABASE_URL=postgresql://apisec_user:apisec_secure_password_123@postgres:5432/apisecurity_db
+      - JWT_SECRET=super-secret-production-grade-random-key-change-me-32chars
+      - CORS_ORIGINS=http://localhost:5173,http://localhost:3000,http://localhost:80
+      - CURRENCY=INR
+      - UPI_ID=merchant@okhdfcbank
+      - PAYMENT_MODE=demo
+      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_MODEL=${LLM_MODEL:-gpt-4o-mini}
+      - ENVIRONMENT=production
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./data:/app/data
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: apisec_frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
