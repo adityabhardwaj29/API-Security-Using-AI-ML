@@ -1,27 +1,29 @@
-from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional
+from pydantic import BaseModel
+from typing import Optional, List
 from datetime import datetime
 
 
-class ProductResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
+class ProductBase(BaseModel):
     name: str
+    brand: Optional[str] = "Generic"
     description: Optional[str] = None
+    specifications: Optional[str] = None
     price: float
-    category: str
-    image_url: Optional[str] = None
-    stock: int
-    rating: float = 4.5
-    created_at: datetime
-
-
-class ProductCreate(BaseModel):
-    name: str = Field(..., min_length=2)
-    description: Optional[str] = None
-    price: float = Field(..., gt=0)
+    original_price: Optional[float] = None
     category: str = "Fashion"
     image_url: Optional[str] = None
-    stock: int = Field(100, ge=0)
-    rating: float = Field(4.5, ge=1.0, le=5.0)
+    stock: int = 100
+    rating: float = 4.5
+    review_count: int = 12
+
+
+class ProductCreate(ProductBase):
+    pass
+
+
+class ProductResponse(ProductBase):
+    id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

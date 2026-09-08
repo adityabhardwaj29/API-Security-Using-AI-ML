@@ -12,17 +12,22 @@ import { Login } from './pages/user/Login';
 import { Register } from './pages/user/Register';
 import { Dashboard } from './pages/user/Dashboard';
 import { Products } from './pages/user/Products';
+import { ProductDetail } from './pages/user/ProductDetail';
+import { Wishlist } from './pages/user/Wishlist';
 import { Cart } from './pages/user/Cart';
 import { Checkout } from './pages/user/Checkout';
 import { Payment } from './pages/user/Payment';
 import { Transactions } from './pages/user/Transactions';
+import { OrderDetail } from './pages/user/OrderDetail';
 import { Profile } from './pages/user/Profile';
 
-// Admin Pages
+// Admin & SOC Pages
 import { AdminLogin } from './pages/admin/AdminLogin';
 import { SOCDashboard } from './pages/admin/SOCDashboard';
 import { ThreatMonitor } from './pages/admin/ThreatMonitor';
 import { ThreatDetail } from './pages/admin/ThreatDetail';
+import { SecurityPipeline } from './pages/admin/SecurityPipeline';
+import { LearnDocs } from './pages/admin/LearnDocs';
 import { PaymentSecurity } from './pages/admin/PaymentSecurity';
 import { UserInvestigation } from './pages/admin/UserInvestigation';
 import { APIMonitor } from './pages/admin/APIMonitor';
@@ -68,7 +73,16 @@ export function App() {
             <Route path="login" element={<Login />} />
             <Route path="register" element={<Register />} />
             <Route path="products" element={<Products />} />
+            <Route path="products/:id" element={<ProductDetail />} />
             <Route path="cart" element={<Cart />} />
+            <Route
+              path="wishlist"
+              element={
+                <ProtectedUserRoute>
+                  <Wishlist />
+                </ProtectedUserRoute>
+              }
+            />
             <Route
               path="dashboard"
               element={
@@ -102,6 +116,14 @@ export function App() {
               }
             />
             <Route
+              path="orders/:id"
+              element={
+                <ProtectedUserRoute>
+                  <OrderDetail />
+                </ProtectedUserRoute>
+              }
+            />
+            <Route
               path="profile"
               element={
                 <ProtectedUserRoute>
@@ -109,6 +131,7 @@ export function App() {
                 </ProtectedUserRoute>
               }
             />
+            <Route path="docs" element={<LearnDocs />} />
           </Route>
 
           {/* Admin Login */}
@@ -127,6 +150,10 @@ export function App() {
             <Route path="dashboard" element={<SOCDashboard />} />
             <Route path="threats" element={<ThreatMonitor />} />
             <Route path="threats/:id" element={<ThreatDetail />} />
+            <Route path="investigation/:id" element={<ThreatDetail />} />
+            <Route path="security-pipeline" element={<SecurityPipeline />} />
+            <Route path="pipeline" element={<SecurityPipeline />} />
+            <Route path="learn" element={<LearnDocs />} />
             <Route path="payments" element={<PaymentSecurity />} />
             <Route path="users" element={<UserInvestigation />} />
             <Route path="users/:userId" element={<UserInvestigation />} />

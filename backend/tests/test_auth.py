@@ -16,7 +16,7 @@ def test_login_user(client):
     # Registered admin
     payload = {
         "email": "admin@apisecurity.io",
-        "password": "Admin@123456"
+        "password": "admin123"
     }
     response = client.post("/api/auth/login", json=payload)
     assert response.status_code == 200

@@ -36,9 +36,9 @@ export const TrafficSimulator = () => {
   return (
     <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
       <div className="page-header" style={{ marginBottom: '1.75rem' }}>
-        <span style={{ fontSize: '0.75rem', fontWeight: '800', color: '#0066ff', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-          Adversarial Simulation & Diagnostics
-        </span>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', background: '#ecfdf5', color: '#065f46', border: '1px solid #a7f3d0', padding: '0.35rem 0.85rem', borderRadius: '2rem', fontSize: '0.8rem', fontWeight: 700, marginBottom: '0.75rem' }}>
+          <Shield size={14} /> CONTROLLED LOCAL ENVIRONMENT • DEMO / SIMULATED
+        </div>
         <h1 className="page-title" style={{ fontSize: '1.875rem', fontWeight: '800', color: '#0f172a', letterSpacing: '-0.02em', marginTop: '0.2rem' }}>
           Real-World Security Attack Simulator
         </h1>

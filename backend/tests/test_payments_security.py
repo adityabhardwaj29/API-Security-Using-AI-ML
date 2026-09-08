@@ -33,7 +33,7 @@ def test_admin_route_protection(client):
     # Admin user accessing admin route -> 200 OK
     admin_login = client.post("/api/auth/login", json={
         "email": "admin@apisecurity.io",
-        "password": "Admin@123456"
+        "password": "admin123"
     })
     admin_token = admin_login.json()["access_token"]
 

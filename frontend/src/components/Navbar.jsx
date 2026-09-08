@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Shield, ShoppingCart, User, LogOut, LayoutDashboard, Menu, X } from 'lucide-react';
+import { Shield, ShoppingCart, User, LogOut, LayoutDashboard, Heart, BookOpen, Menu, X } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
 export const Navbar = ({ cartCount = 0 }) => {
@@ -15,10 +15,10 @@ export const Navbar = ({ cartCount = 0 }) => {
 
   return (
     <header style={{
-      backgroundColor: 'rgba(10, 14, 23, 0.92)',
+      backgroundColor: 'rgba(10, 14, 23, 0.95)',
       WebkitBackdropFilter: 'blur(12px)',
       backdropFilter: 'blur(12px)',
-      borderBottom: '1px solid var(--border-subtle)',
+      borderBottom: '1px solid #1e293b',
       position: 'sticky',
       top: 0,
       zIndex: 50,
@@ -37,12 +37,12 @@ export const Navbar = ({ cartCount = 0 }) => {
             width: '36px',
             height: '36px',
             borderRadius: '10px',
-            background: 'linear-gradient(135deg, #3b82f6, #06b6d4)',
+            background: 'linear-gradient(135deg, #0284c7, #06b6d4)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             color: '#ffffff',
-            boxShadow: '0 0 15px rgba(59, 130, 246, 0.4)',
+            boxShadow: '0 0 15px rgba(2, 132, 199, 0.4)',
           }}>
             <Shield size={20} />
           </div>
@@ -51,17 +51,21 @@ export const Navbar = ({ cartCount = 0 }) => {
               API<span style={{ color: '#38bdf8' }}>SEC</span> AI/ML
             </div>
             <div style={{ fontSize: '0.65rem', color: '#94a3b8', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-              Real-World Defense Platform
+              Indian E-Commerce Defense Platform
             </div>
           </div>
         </Link>
 
         {/* Desktop Nav Links */}
-        <nav style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }} className="desktop-nav">
-          <Link to="/products" style={{ color: '#cbd5e1', fontWeight: '600', fontSize: '0.9rem' }}>
+        <nav style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }} className="desktop-nav">
+          <Link to="/products" style={{ color: '#cbd5e1', fontWeight: '600', fontSize: '0.9rem', textDecoration: 'none' }}>
             Products
           </Link>
-          <Link to="/cart" style={{ position: 'relative', color: '#cbd5e1', display: 'flex', alignItems: 'center', gap: '0.35rem', fontWeight: '600', fontSize: '0.9rem' }}>
+          <Link to="/wishlist" style={{ color: '#cbd5e1', display: 'flex', alignItems: 'center', gap: '0.3rem', fontWeight: '600', fontSize: '0.9rem', textDecoration: 'none' }}>
+            <Heart size={16} color="#fda4af" />
+            <span>Wishlist</span>
+          </Link>
+          <Link to="/cart" style={{ position: 'relative', color: '#cbd5e1', display: 'flex', alignItems: 'center', gap: '0.35rem', fontWeight: '600', fontSize: '0.9rem', textDecoration: 'none' }}>
             <ShoppingCart size={18} />
             <span>Cart</span>
             {cartCount > 0 && (
@@ -69,7 +73,7 @@ export const Navbar = ({ cartCount = 0 }) => {
                 position: 'absolute',
                 top: '-8px',
                 right: '-10px',
-                background: '#3b82f6',
+                background: '#0284c7',
                 color: '#ffffff',
                 fontSize: '0.7rem',
                 fontWeight: '700',
@@ -86,15 +90,15 @@ export const Navbar = ({ cartCount = 0 }) => {
           </Link>
 
           {user && (
-            <>
-              <Link to="/dashboard" style={{ color: '#cbd5e1', fontWeight: '600', fontSize: '0.9rem' }}>
-                Dashboard
-              </Link>
-              <Link to="/transactions" style={{ color: '#cbd5e1', fontWeight: '600', fontSize: '0.9rem' }}>
-                Transactions
-              </Link>
-            </>
+            <Link to="/transactions" style={{ color: '#cbd5e1', fontWeight: '600', fontSize: '0.9rem', textDecoration: 'none' }}>
+              Orders
+            </Link>
           )}
+
+          <Link to="/docs" style={{ color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '0.35rem', fontWeight: '600', fontSize: '0.85rem', textDecoration: 'none' }}>
+            <BookOpen size={15} />
+            <span>Docs & Viva</span>
+          </Link>
 
           {/* Admin Switcher */}
           <Link
@@ -103,13 +107,14 @@ export const Navbar = ({ cartCount = 0 }) => {
               display: 'inline-flex',
               alignItems: 'center',
               gap: '0.4rem',
-              background: 'rgba(239, 68, 68, 0.12)',
-              border: '1px solid rgba(239, 68, 68, 0.35)',
-              color: '#fda4af',
+              background: 'rgba(2, 132, 199, 0.15)',
+              border: '1px solid rgba(56, 189, 248, 0.4)',
+              color: '#38bdf8',
               padding: '0.35rem 0.75rem',
-              borderRadius: 'var(--radius-md)',
+              borderRadius: '0.5rem',
               fontSize: '0.8rem',
               fontWeight: '700',
+              textDecoration: 'none',
             }}
           >
             <Shield size={14} />
@@ -119,7 +124,7 @@ export const Navbar = ({ cartCount = 0 }) => {
           {/* User Profile / Auth Action */}
           {user ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-              <Link to="/profile" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#f8fafc', fontWeight: '600', fontSize: '0.875rem' }}>
+              <Link to="/profile" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#f8fafc', fontWeight: '600', fontSize: '0.875rem', textDecoration: 'none' }}>
                 <User size={16} color="#38bdf8" />
                 <span>{user.name.split(' ')[0]}</span>
               </Link>
@@ -127,17 +132,17 @@ export const Navbar = ({ cartCount = 0 }) => {
                 onClick={handleLogout}
                 className="btn btn-secondary btn-sm"
                 title="Logout"
-                style={{ padding: '0.35rem 0.65rem' }}
+                style={{ padding: '0.35rem 0.65rem', background: '#1e293b', border: '1px solid #334155', color: '#cbd5e1', cursor: 'pointer', borderRadius: '0.375rem' }}
               >
                 <LogOut size={14} />
               </button>
             </div>
           ) : (
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <Link to="/login" className="btn btn-secondary btn-sm">
+              <Link to="/login" style={{ color: '#ffffff', background: '#1e293b', border: '1px solid #334155', padding: '0.4rem 0.85rem', borderRadius: '0.375rem', fontSize: '0.85rem', fontWeight: 600, textDecoration: 'none' }}>
                 Login
               </Link>
-              <Link to="/register" className="btn btn-primary btn-sm">
+              <Link to="/register" style={{ color: '#ffffff', background: '#0284c7', padding: '0.4rem 0.85rem', borderRadius: '0.375rem', fontSize: '0.85rem', fontWeight: 600, textDecoration: 'none' }}>
                 Register
               </Link>
             </div>
@@ -147,3 +152,5 @@ export const Navbar = ({ cartCount = 0 }) => {
     </header>
   );
 };
+
+export default Navbar;

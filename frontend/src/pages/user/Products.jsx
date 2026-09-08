@@ -167,12 +167,16 @@ export const Products = () => {
           {products.map((product) => (
             <div key={product.id} className="card card-hover" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 0 }}>
               {/* Product Image */}
-              <div style={{
-                height: '210px',
-                backgroundColor: '#0f172a',
-                overflow: 'hidden',
-                position: 'relative',
-              }}>
+              <div
+                onClick={() => navigate(`/products/${product.id}`)}
+                style={{
+                  height: '220px',
+                  backgroundColor: '#0f172a',
+                  overflow: 'hidden',
+                  position: 'relative',
+                  cursor: 'pointer',
+                }}
+              >
                 <img
                   src={product.image_url || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=500&auto=format&fit=crop&q=60'}
                   alt={product.name}
@@ -181,7 +185,7 @@ export const Products = () => {
                 <span style={{
                   position: 'absolute',
                   top: '10px',
-                  right: '10px',
+                  left: '10px',
                   background: 'rgba(15, 23, 42, 0.85)',
                   WebkitBackdropFilter: 'blur(6px)',
                   backdropFilter: 'blur(6px)',
@@ -212,17 +216,23 @@ export const Products = () => {
                   border: '1px solid var(--border-subtle)',
                 }}>
                   <Star size={13} fill="#fbbf24" />
-                  <span>{product.rating || 4.5}</span>
+                  <span>{product.rating ? product.rating.toFixed(1) : '4.5'}</span>
                 </div>
               </div>
 
               {/* Product Info */}
               <div style={{ padding: '1.25rem', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                 <div>
-                  <h3 style={{ fontSize: '1.1rem', fontWeight: '700', color: '#ffffff', marginBottom: '0.4rem' }}>
+                  <div style={{ fontSize: '0.75rem', color: '#38bdf8', fontWeight: '700', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
+                    {product.brand || 'Authentic'}
+                  </div>
+                  <h3
+                    onClick={() => navigate(`/products/${product.id}`)}
+                    style={{ fontSize: '1.05rem', fontWeight: '700', color: '#ffffff', marginBottom: '0.4rem', cursor: 'pointer', lineHeight: '1.3' }}
+                  >
                     {product.name}
                   </h3>
-                  <p style={{ color: '#94a3b8', fontSize: '0.8125rem', lineHeight: '1.5', marginBottom: '1.25rem' }}>
+                  <p style={{ color: '#94a3b8', fontSize: '0.8125rem', lineHeight: '1.5', marginBottom: '1.25rem', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                     {product.description}
                   </p>
                 </div>
@@ -241,15 +251,25 @@ export const Products = () => {
                     </div>
                   </div>
 
-                  <button
-                    onClick={() => handleAddToCart(product)}
-                    className="btn btn-primary"
-                    style={{ width: '100%' }}
-                    disabled={addingId === product.id}
-                  >
-                    <ShoppingCart size={16} />
-                    <span>{addingId === product.id ? 'Adding...' : 'Add to Cart'}</span>
-                  </button>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button
+                      onClick={() => handleAddToCart(product)}
+                      className="btn btn-primary"
+                      style={{ flex: 1 }}
+                      disabled={addingId === product.id}
+                    >
+                      <ShoppingCart size={16} />
+                      <span>{addingId === product.id ? 'Adding...' : 'Add to Cart'}</span>
+                    </button>
+                    <button
+                      onClick={() => navigate(`/products/${product.id}`)}
+                      className="btn btn-secondary"
+                      style={{ padding: '0.5rem 0.75rem' }}
+                      title="View Product Details"
+                    >
+                      View
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

@@ -1,159 +1,156 @@
 # Real-World Indian E-Commerce + API Security Using AI/ML
 
-A full-stack, production-grade cybersecurity web platform natively integrated with an Indian E-Commerce marketplace. Combines real-time behavioral API telemetry, NetworkX transition flow graphs, Machine Learning (Isolation Forest), PyTorch Graph Neural Networks (GNN), Explainable AI (SHAP), LLM Threat Synthesis, and a dynamic UPI QR payment engine.
+[![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688.svg?style=flat&logo=fastapi)](https://fastapi.tiangolo.com)
+[![React](https://img.shields.io/badge/Frontend-React%2018%20%2B%20Vite-61DAFB.svg?style=flat&logo=react)](https://react.dev)
+[![PyTorch](https://img.shields.io/badge/Deep%20Learning-PyTorch%20%26%20PyG-EE4C2C.svg?style=flat&logo=pytorch)](https://pytorch.org)
+[![Scikit-Learn](https://img.shields.io/badge/ML-Isolation%20Forest-F7931E.svg?style=flat&logo=scikit-learn)](https://scikit-learn.org)
+[![NetworkX](https://img.shields.io/badge/Graph-NetworkX-3178C6.svg?style=flat)](https://networkx.org)
+[![SHAP](https://img.shields.io/badge/XAI-SHAP-brightgreen.svg?style=flat)](https://shap.readthedocs.io)
+[![Tests](https://img.shields.io/badge/Tests-20%2F20%20Passing-success.svg?style=flat)](file:///c:/api-security-ai-ml/backend/tests)
 
 ---
 
-## 🌟 Dual Operational Environments
+## 🌟 Dual Connected Systems: Market + Defense
 
-### 1. Customer Storefront (Indian E-Commerce)
-- **Indian Rupee Standard (`₹`, `INR`)**: Realistic catalog across 4 categories:
-  1. *Fashion* (T-Shirts, Jeans, Hoodies, Sneakers, Watches, Bags)
-  2. *Electronics* (Earbuds, Smart Watches, Power Banks, Chargers)
-  3. *Home & Lifestyle* (Desk Lamps, Steel Flasks, Eco Mats, Aroma Diffusers)
-  4. *Beauty & Personal Care* (Face Serums, Beard Trimmers, Sunscreen, Moisturizers)
-- **Dynamic UPI QR Scan & Pay**: Generates compliant `upi://pay?pa=...` URI strings for Google Pay, PhonePe, Paytm, BHIM, CRED, Navi, and custom VPAs.
-- **Safe ₹0 Demo Mode**: Clear badge `Demo transaction — no real money transferred` allowing safe exploration of payment risk flows without real money transfers.
-- **Human-Friendly Security Challenges**: If an anomalous transaction occurs, users receive a clean `⚠️ SECURITY CHECK REQUIRED` step-up modal with `[ Verify Identity ]` and `[ Cancel Payment ]` rather than internal ML scores.
-- **Ledger & Audit Trail**: Real-time order tracking and UPI transaction history.
-
-### 2. Admin Security Operations Center (SOC)
-- **Visual Design**: Modern **White Base (`#ffffff` / `#f8fafc`) + Deep Blue Typography (`#0f172a`) + Electric Blue Neon Highlights (`#0066ff`)**.
-- **Live Threat Stream**: Zero-latency WebSocket threat broadcast stream with real-time alert banners.
-- **UPI Payment Security View (`/admin/payments`)**: Indian Rupee transaction volume, completed vs flagged vs held transactions, and payment risk breakdowns.
-- **Interactive API Flow Graph (`/admin/graph`)**: Interactive NetworkX directed multi-graph canvas with zoom/pan and node inspector.
-- **Explainable AI (XAI / SHAP)**: Local feature attribution graphs for 14 continuous behavioral metrics with transparent fallback reporting.
-- **LLM Threat Synthesis**: OpenAI-compatible / deterministic intelligence engine providing root cause analysis and actionable SOC recommendations (LLM never decides Allow/Block).
-- **User Behavioral Investigation (`/admin/users`)**: Searchable user directory and chronological session sequence reconstruction.
-- **PyTorch GNN & ML Hub (`/admin/models`)**: Real-time evaluation matrix (Accuracy, Precision, Recall, F1, ROC-AUC, FPR) and flow graph GNN training trigger.
-- **Attack Simulator (`/admin/simulator`)**: One-click synthetic attack generator (Normal Flow, Payment Flood, Admin Probing, Brute-Force Login).
-- **SOC Settings (`/admin/settings`)**: Risk engine calibrated thresholds, UPI merchant VPAs, and model configuration.
-
----
-
-## 🏗️ Technology Stack
-
-| Layer | Technologies |
-|---|---|
-| **Frontend** | React 18, Vite, React Router 6, Recharts, Lucide React, Modern CSS Tokens |
-| **Backend** | Python 3.12+, FastAPI, Uvicorn, SQLAlchemy, Pydantic v2 |
-| **Database** | SQLite (Zero-config local) / PostgreSQL (Production & Docker) |
-| **Machine Learning** | Scikit-Learn (Isolation Forest), NumPy, Pandas |
-| **API Flow Graph** | NetworkX (Directed Flow Graph) |
-| **Deep Learning (GNN)** | PyTorch & PyTorch Geometric (Graph Convolution Network) |
-| **Explainability (XAI)** | SHAP (TreeExplainer & KernelExplainer) + Standardized Evidence Fallback |
-| **Threat Synthesis** | OpenAI-Compatible LLM API (`gpt-4o-mini`) + Deterministic Rule Engine |
-| **Realtime Stream** | WebSockets (`/api/realtime/ws`) |
-| **DevOps** | Docker, Docker Compose, Nginx |
-
----
-
-## 📂 Project Structure
+This platform is engineered as **TWO interconnected systems working in real-time**:
 
 ```
-api-security-ai-ml/
-├── backend/
-│   ├── app/
-│   │   ├── main.py                     # FastAPI application factory, CORS, routers & seeding
-│   │   ├── config.py                   # Settings (INR, UPI ID, Payment Mode, LLM, Risk Thresholds)
-│   │   ├── database.py                 # SQLAlchemy engine, session maker, Base
-│   │   ├── models/                     # User, Product, CartItem, Order, Payment, Threat, etc.
-│   │   ├── schemas/                    # Pydantic v2 request/response models
-│   │   ├── security/                   # Bcrypt, JWT, RBAC permissions, audit middleware, rate limiter
-│   │   ├── ml/                         # 14-Feature Engineer, Isolation Forest, Risk Engine, Evaluator
-│   │   ├── graph/                      # NetworkX Flow Graph constructor (nodes, edges, metrics)
-│   │   ├── gnn/                        # PyTorch GNN model, dataset builder, train & inference
-│   │   ├── explainability/             # SHAP explainer & feature attribution analyzer
-│   │   ├── llm/                        # Structured LLM Threat Synthesizer
-│   │   ├── realtime/                   # WebSocket ConnectionManager & broadcast channels
-│   │   ├── services/                   # Logging, Payment, Threat & Synthetic Demo Generator
-│   │   └── routes/                     # Auth, Users, Products, Cart, Orders, Payments, Threats, Admin
-│   ├── tests/                          # Automated pytest suite (Scenarios 1–5)
-│   ├── requirements.txt
-│   └── Dockerfile
-│
-├── frontend/
-│   ├── src/
-│   │   ├── components/                 # Badge, Modal, ThreatAlertBanner, FlowGraphView, XAIBarChart
-│   │   ├── layouts/                    # UserLayout, AdminLayout (White/Blue Neon)
-│   │   ├── pages/
-│   │   │   ├── user/                   # Home, Products, Cart, Checkout, Payment (UPI), Dashboard, Transactions
-│   │   │   └── admin/                  # SOCDashboard, ThreatMonitor, ThreatDetail, PaymentSecurity, Graph, Users, APIs, Models, Simulator, Settings
-│   │   ├── services/                   # api.js (Axios), websocket.js
-│   │   ├── styles/                     # index.css, admin.css
-│   │   └── App.jsx
-│   ├── package.json
-│   └── vite.config.js
-│
-├── docs/                               # 8 Comprehensive Architecture & Technical Documents
-├── data/                               # Saved model weights (data/gnn_checkpoint.pt)
-├── docker-compose.yml
-└── README.md
+ [ PRODUCT A: INDIAN E-COMMERCE PLATFORM ]
+  Register → Login → Catalog → PIN Delivery Check → Wishlist → Cart → Server-Validated Coupons → Multi-Step Checkout → Dynamic UPI QR (₹0 Demo) → Order Tracking Lifecycle
+                                          │
+                                   HTTP Telemetry
+                                          ▼
+ [ PRODUCT B: AI/ML API SECURITY SOC INTELLIGENCE ]
+  1. API Interceptor → 2. Structured Logger → 3. 14-Feature Sliding Window → 4. Isolation Forest ML → 5. NetworkX Flow Graph → 6. PyTorch Geometric GNN → 7. Multi-Signal Risk Engine → 8. SHAP XAI → 9. LLM Synthesizer → 10. Real-Time WebSocket Alert
 ```
 
 ---
 
-## 🚀 Quickstart & Installation
+## 📋 Comprehensive Feature Architecture
 
-### Option 1: Direct Local Execution
+### 1. Storefront Features (Product A)
+- **Indian Rupee Catalog (`₹`, `INR`)**: 18 authentic Indian products across Fashion, Electronics, Home & Lifestyle, Beauty & Personal Care, Footwear, and Gourmet Grocery.
+- **Product Details & Verified Reviews**: High-resolution image previews, key specifications, 1-5 star ratings, verified purchase reviews, and real-time 6-digit Indian PIN code delivery estimators.
+- **Wishlist Manager (`/wishlist`)**: Save favorite products, stock awareness, and 1-click move to shopping cart.
+- **Server-Side Coupon Engine**: Backend-validated coupons (`WELCOME50`, `FESTIVE200`, `SUPERSEC10`, `FREESHIP`) enforcing minimum order values and discount caps.
+- **Delivery Address Book (`/profile/addresses`)**: Add, edit, and set default shipping addresses.
+- **Multi-Step Checkout**: Clear 5-step progress indicator (Cart → Address → Payment Mode → Security Check → Order Placed).
+- **Dynamic UPI QR & ₹0 Demo Mode**: Dynamic scannable UPI QR code generation (`aadityabhardwaj5398@oksbi`) and ₹0 risk-free demonstration mode with honest labeling.
+- **Order Tracking Lifecycle (`/orders/:id`)**: Step-by-step progress tracking: `PLACED` → `CONFIRMED` → `PROCESSING` → `SHIPPED` → `OUT_FOR_DELIVERY` → `DELIVERED`.
 
-#### 1. Backend
+### 2. SOC Security & AI/ML Pipeline (Product B)
+- **10-Step Investigation Story (`/admin/threats/:id`)**: Complete end-to-end evidence trace from raw request to final SOC remediation.
+- **"Why was this flagged?" Drawer**: Data-backed explanation breakdown citing velocity metrics, error spikes, payment bursts, and sequence anomalies.
+- **Interactive Security Pipeline Visualizer (`/admin/security-pipeline`)**: Clickable 10-stage architecture showing inputs, outputs, algorithms, and database tables.
+- **Academic Learn & Viva Defense Guide (`/admin/learn` & `/docs`)**: Detailed plain-language documentation explaining all ML, GNN, XAI, and risk math.
+- **Live SOC Dashboard (`/admin/dashboard`)**: Database-backed metrics, live WebSocket threat feed, risk distributions, and suspicious endpoint counters.
+- **NetworkX API Interaction Graph (`/admin/graph`)**: Interactive directed state transition graph detecting workflow sequence jumps.
+- **PyTorch Geometric GNN Hub (`/admin/models`)**: GraphSAGE graph convolutional network modeling multi-hop API transitions with retrain triggers.
+- **Controlled Demo Attack Simulator (`/admin/simulator`)**: Safe local test scenarios (Normal Journey, Payment Flood, Sequence Bypass, Brute-Force Login) clearly badged `DEMO / SIMULATED`.
+
+---
+
+## 🔬 AI/ML & Explainability Pipeline
+
+### 1. 14-Feature Behavioral Extractor
+Every active user session is analyzed across a 60-second sliding window:
+1. `requests_per_minute`: Request velocity
+2. `request_count`: Total requests in window
+3. `unique_endpoints`: Diversity of accessed endpoints
+4. `error_rate`: Ratio of 4xx/5xx HTTP errors
+5. `average_response_time`: Server latency
+6. `payment_frequency`: Payment verification attempts
+7. `failed_login_count`: Authentication failure rate
+8. `admin_access_frequency`: Administrative route probing
+9. `sensitive_endpoint_access`: Critical API calls
+10. `endpoint_transition_frequency`: Markov state changes
+11. `status_4xx_ratio`: Client-side error proportion
+12. `status_5xx_ratio`: Server-side error proportion
+13. `behavior_deviation`: Deviation from baseline profile
+14. `activity_velocity_score`: Exponential decay activity score
+
+### 2. Isolation Forest ML
+- **Algorithm**: `IsolationForest(n_estimators=100, contamination=0.08)`
+- **Function**: Isolates outliers in 14-dimensional feature space.
+
+### 3. PyTorch Geometric GNN
+- **Model**: GraphSAGE / GCN (2-layer `SAGEConv`, Hidden Dim = 32, ReLU, Dropout = 0.2)
+- **Function**: Detects structural sequence bypasses (e.g., jumping from `/api/products` directly to `/api/payments/verify` without visiting `/api/cart`).
+
+### 4. Multi-Signal Risk Engine
+- **Formula**: `Risk = 0.40 * ML_Score + 0.35 * GNN_Score + 0.25 * Heuristic_Criticality`
+- **Output Levels**: `LOW` (0-44), `MEDIUM` (45-74), `HIGH` (75-89), `CRITICAL` (90-100).
+
+### 5. Explainable AI (SHAP & LLM)
+- **SHAP**: Shapley additive feature importance rankings (`TreeExplainer`).
+- **LLM Synthesizer**: Converts structured evidence into clear SOC incident summaries using `gpt-4o-mini` (or deterministic rule synthesizer fallback).
+
+---
+
+## 🚀 Local Setup & Quickstart
+
+### Prerequisites
+- Python 3.12+
+- Node.js 18+ and npm
+- Git
+
+### 1. Clone the Repository
 ```bash
-cd backend
-python -m pip install -r requirements.txt
+git clone https://github.com/adityabhardwaj29/API-Security-Using-AI-ML.git
+cd API-Security-Using-AI-ML
+```
+
+### 2. Backend Setup & Startup
+```powershell
+# From project root:
+python -m pip install -r backend/requirements.txt
 python -m uvicorn backend.app.main:app --reload --port 8000
 ```
-*OpenAPI Documentation: `http://localhost:8000/docs`.*
+> **Backend API Docs (Swagger)**: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)  
+> **Backend Health**: [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health)
 
-#### 2. Frontend
-```bash
+### 3. Frontend Setup & Startup
+```powershell
 cd frontend
 npm install
 npm run dev
 ```
-*Frontend: `http://localhost:5173`.*
-
----
-
-### Option 2: Docker Compose
-
-```bash
-docker compose up --build
-```
-- Storefront & SOC UI: `http://localhost:3000`
-- Backend API: `http://localhost:8000`
+> **Storefront & Admin Console**: [http://127.0.0.1:5173/](http://127.0.0.1:5173/)
 
 ---
 
 ## 🔑 Default Credentials
 
-| Role | Email | Password | Access Portal |
+| Account | Email | Password | Role |
 |---|---|---|---|
-| **SOC Administrator** | `admin@apisecurity.io` | `Admin@123456` | `/admin/dashboard` or `/admin/login` |
-| **Demo Customer** | `user@apisecurity.io` | `User@123456` | `/login` → `/products` |
-
-*Step-Up Verification Sandbox Code:* `123456`
+| **Admin SOC** | `admin@apisecurity.io` | `admin123` | **ADMIN** |
+| **Demo Customer** | `user@apisecurity.io` | `User@123456` | **USER** |
+| **New Customer** | Any valid email on [Sign Up](http://127.0.0.1:5173/register) | Custom | **USER** |
 
 ---
 
-## 🔬 Automated Test Suite
+## 🐳 Docker Deployment
 
-Run the full end-to-end test suite including Scenarios 1–5 (Section 43):
+To launch the complete multi-service stack with PostgreSQL 16 Alpine, Backend, and Frontend:
 
 ```bash
-cd backend
-python -m pytest tests/ -v
+docker-compose up --build
 ```
+
+- **Frontend**: `http://localhost:3000`
+- **Backend API**: `http://localhost:8000`
+- **PostgreSQL**: `localhost:5432`
 
 ---
 
-## 📚 Technical Documentation Index
+## 🧪 Running Automated Tests
 
-- [Architecture Overview](file:///c:/api-security-ai-ml/docs/architecture.md)
-- [UPI Payment Flow & ₹0 Demo Mode](file:///c:/api-security-ai-ml/docs/payment-flow.md)
-- [API Security & Threat Mitigation](file:///c:/api-security-ai-ml/docs/security.md)
-- [Machine Learning & 14-Feature Pipeline](file:///c:/api-security-ai-ml/docs/ml-pipeline.md)
-- [PyTorch GNN Structural Modeling](file:///c:/api-security-ai-ml/docs/gnn.md)
-- [Explainable AI (XAI / SHAP)](file:///c:/api-security-ai-ml/docs/xai.md)
-- [LLM Threat Synthesis](file:///c:/api-security-ai-ml/docs/llm.md)
-- [Admin SOC Visual Specifications](file:///c:/api-security-ai-ml/docs/admin-dashboard.md)
+```powershell
+python -m pytest backend/tests/ -v
+```
+**Test Results**: 20/20 Test Cases Passing (`test_auth.py`, `test_products_cart.py`, `test_payments_security.py`, `test_ml_detector.py`, `test_ecommerce_features.py`, `test_scenarios.py`).
+
+---
+
+## 📜 License
+MIT License. Built for advanced cybersecurity research, academic demonstration, and production API defense.
