@@ -11,7 +11,11 @@ import {
   TrendingUp,
   RefreshCw,
   Eye,
-  Filter
+  Filter,
+  Download,
+  Unlock,
+  Ban,
+  Check
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import api from '../../services/api';
@@ -21,6 +25,9 @@ export const PaymentSecurity = () => {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [filterTab, setFilterTab] = useState('ALL'); // ALL, HELD, COMPLETED, HIGH_RISK
+  const [actionLoadingId, setActionLoadingId] = useState(null);
+  const [actionMessage, setActionMessage] = useState(null);
 
   const fetchPaymentSecurity = async () => {
     try {
@@ -39,6 +46,35 @@ export const PaymentSecurity = () => {
     fetchPaymentSecurity();
   }, []);
 
+  const handleOverridePayment = async (paymentId, action) => {
+    setActionLoadingId(paymentId);
+    setActionMessage(null);
+    try {
+      const res = await api.post(`/admin/payments/${paymentId}/override`, { action });
+      setActionMessage({ type: 'success', text: res.data.message });
+      await fetchPaymentSecurity();
+      setTimeout(() => setActionMessage(null), 4000);
+    } catch (err) {
+      console.error('Failed to override payment:', err);
+      setActionMessage({ type: 'error', text: 'Failed to update payment status.' });
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleExportPayments = () => {
+    if (!stats?.recent_transactions) return;
+    const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(
+      JSON.stringify(stats.recent_transactions, null, 2)
+    )}`;
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute('href', jsonString);
+    downloadAnchor.setAttribute('download', `payment_security_telemetry_${new Date().toISOString().slice(0,10)}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+  };
+
   if (loading) {
     return (
       <div style={{ textAlign: 'center', padding: '5rem', color: '#64748b' }}>
@@ -47,8 +83,15 @@ export const PaymentSecurity = () => {
     );
   }
 
+  const transactions = (stats?.recent_transactions || []).filter((txn) => {
+    if (filterTab === 'HELD') return txn.status === 'HELD' || txn.status === 'VERIFICATION_REQUIRED' || txn.status === 'PENDING';
+    if (filterTab === 'COMPLETED') return txn.status === 'COMPLETED';
+    if (filterTab === 'HIGH_RISK') return txn.risk_level === 'HIGH' || txn.risk_level === 'CRITICAL';
+    return true;
+  });
+
   return (
-    <div style={{ padding: '2rem' }}>
+    <div style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto' }}>
       {/* Page Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
@@ -56,22 +99,54 @@ export const PaymentSecurity = () => {
             SOC Telemetry & Risk Intelligence
           </span>
           <h1 style={{ fontSize: '1.875rem', fontWeight: '800', color: '#0f172a', letterSpacing: '-0.02em', marginTop: '0.2rem' }}>
-            UPI Payment Security Center
+            UPI Payment Security & Fraud Mitigation Center
           </h1>
+          <p style={{ color: '#64748b', fontSize: '0.875rem', marginTop: '0.2rem' }}>
+            Real-time velocity monitoring, step-up MFA authorization, and SOC admin transaction overrides.
+          </p>
         </div>
 
-        <button
-          onClick={fetchPaymentSecurity}
-          className="btn btn-secondary btn-sm"
-          style={{ background: '#ffffff', color: '#0f172a', borderColor: '#e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}
-          disabled={refreshing}
-        >
-          <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
-          <span>{refreshing ? 'Refreshing...' : 'Refresh Data'}</span>
-        </button>
+        <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <button
+            onClick={handleExportPayments}
+            className="btn btn-secondary btn-sm"
+            style={{ background: '#ffffff', borderColor: '#e2e8f0', color: '#0066ff' }}
+          >
+            <Download size={14} />
+            <span>Export Telemetry (JSON)</span>
+          </button>
+          <button
+            onClick={fetchPaymentSecurity}
+            className="btn btn-secondary btn-sm"
+            style={{ background: '#ffffff', color: '#0f172a', borderColor: '#e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}
+            disabled={refreshing}
+          >
+            <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
+            <span>{refreshing ? 'Refreshing...' : 'Refresh Data'}</span>
+          </button>
+        </div>
       </div>
 
-      {/* KPI Cards Grid (Section 32) */}
+      {/* Action Notification */}
+      {actionMessage && (
+        <div style={{
+          padding: '0.85rem 1.25rem',
+          borderRadius: 'var(--radius-md)',
+          background: actionMessage.type === 'success' ? '#ecfdf5' : '#fff1f2',
+          border: actionMessage.type === 'success' ? '1px solid #a7f3d0' : '1px solid #fecdd3',
+          color: actionMessage.type === 'success' ? '#065f46' : '#be123c',
+          marginBottom: '1.5rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          fontSize: '0.875rem',
+        }}>
+          {actionMessage.type === 'success' ? <CheckCircle2 size={18} /> : <AlertTriangle size={18} />}
+          <span>{actionMessage.text}</span>
+        </div>
+      )}
+
+      {/* KPI Cards Grid */}
       <div className="grid-4" style={{ marginBottom: '2rem' }}>
         <div className="metric-card">
           <div className="metric-title">Total UPI Transactions</div>
@@ -201,7 +276,7 @@ export const PaymentSecurity = () => {
                       {t.threat_type}
                     </div>
                     <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.2rem' }}>
-                      User #{t.user_id} • Score: {t.anomaly_score * 100}% • {new Date(t.created_at).toLocaleTimeString()}
+                      User #{t.user_id} • Score: {Math.round(t.anomaly_score * 100)}% • {new Date(t.created_at).toLocaleTimeString()}
                     </div>
                   </div>
 
@@ -219,16 +294,46 @@ export const PaymentSecurity = () => {
         </div>
       </div>
 
-      {/* Full Transaction Audit Table */}
+      {/* Full Transaction Audit Table with Filters & Overrides */}
       <div className="card" style={{ background: '#ffffff', borderColor: '#e2e8f0', boxShadow: '0 4px 12px rgba(15,23,42,0.04)' }}>
-        <h3 style={{ fontSize: '1.15rem', fontWeight: '800', color: '#0f172a', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <CreditCard size={18} color="#0066ff" />
-          <span>Real-Time UPI Payment Telemetry</span>
-        </h3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+          <h3 style={{ fontSize: '1.15rem', fontWeight: '800', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <CreditCard size={18} color="#0066ff" />
+            <span>Real-Time UPI Payment Telemetry & Action Controls</span>
+          </h3>
 
-        {(!stats?.recent_transactions || stats.recent_transactions.length === 0) ? (
+          {/* Filter Tabs */}
+          <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+            {[
+              { id: 'ALL', label: 'All Transactions' },
+              { id: 'HELD', label: 'Held / Challenge Required' },
+              { id: 'COMPLETED', label: 'Completed' },
+              { id: 'HIGH_RISK', label: 'High / Critical Risk' },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setFilterTab(tab.id)}
+                style={{
+                  fontSize: '0.75rem',
+                  padding: '0.3rem 0.65rem',
+                  borderRadius: '0.5rem',
+                  border: filterTab === tab.id ? '1.5px solid #0066ff' : '1px solid #e2e8f0',
+                  background: filterTab === tab.id ? '#eff6ff' : '#f8fafc',
+                  color: filterTab === tab.id ? '#0066ff' : '#64748b',
+                  fontWeight: filterTab === tab.id ? 700 : 500,
+                  cursor: 'pointer',
+                }}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {transactions.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>
-            No payment transaction logs available.
+            No payment transaction logs match the current filter.
           </div>
         ) : (
           <div className="table-responsive">
@@ -242,10 +347,11 @@ export const PaymentSecurity = () => {
                   <th style={{ background: '#f8fafc', color: '#475569' }}>Status</th>
                   <th style={{ background: '#f8fafc', color: '#475569' }}>Risk Level</th>
                   <th style={{ background: '#f8fafc', color: '#475569' }}>Timestamp</th>
+                  <th style={{ background: '#f8fafc', color: '#475569' }}>SOC Action</th>
                 </tr>
               </thead>
               <tbody>
-                {stats.recent_transactions.map((txn) => (
+                {transactions.map((txn) => (
                   <tr key={txn.id}>
                     <td style={{ fontFamily: 'var(--font-mono)', fontWeight: '700', color: '#0066ff', fontSize: '0.825rem' }}>
                       {txn.transaction_reference || `UPI-${txn.id}`}
@@ -268,6 +374,34 @@ export const PaymentSecurity = () => {
                     <td style={{ color: '#64748b', fontSize: '0.8rem' }}>
                       {new Date(txn.created_at).toLocaleTimeString()}
                     </td>
+                    <td>
+                      {txn.status !== 'COMPLETED' ? (
+                        <div style={{ display: 'flex', gap: '0.35rem' }}>
+                          <button
+                            onClick={() => handleOverridePayment(txn.id, 'APPROVE')}
+                            className="btn btn-sm btn-primary"
+                            disabled={actionLoadingId === txn.id}
+                            style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem' }}
+                            title="Approve & Release Hold"
+                          >
+                            <Unlock size={12} /> Release Hold
+                          </button>
+                          <button
+                            onClick={() => handleOverridePayment(txn.id, 'REJECT')}
+                            className="btn btn-sm btn-secondary"
+                            disabled={actionLoadingId === txn.id}
+                            style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem', borderColor: '#fca5a5', color: '#b91c1c', background: '#fff1f2' }}
+                            title="Reject Transaction"
+                          >
+                            <Ban size={12} /> Reject
+                          </button>
+                        </div>
+                      ) : (
+                        <span style={{ fontSize: '0.75rem', color: '#059669', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                          <Check size={14} /> Approved
+                        </span>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -278,3 +412,5 @@ export const PaymentSecurity = () => {
     </div>
   );
 };
+
+export default PaymentSecurity;

@@ -1,8 +1,9 @@
 import datetime
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
+from pydantic import BaseModel, Field
 from backend.app.config import settings
 from backend.app.database import get_db
 from backend.app.models.user import User
@@ -10,6 +11,7 @@ from backend.app.models.api_log import ApiLog
 from backend.app.models.threat import Threat
 from backend.app.models.payment import Payment
 from backend.app.models.explanation import ThreatExplanation
+from backend.app.models.snapshots import FeatureSnapshot
 from backend.app.schemas.admin import (
     AdminOverviewStats,
     PaymentSecurityStats,
@@ -28,6 +30,22 @@ from backend.app.ml.detector import detector
 from backend.app.ml.evaluation import evaluator
 from backend.app.services.logging_service import logging_service
 from backend.app.services.demo_generator import demo_generator
+
+
+class AdminSettingsUpdateRequest(BaseModel):
+    medium_threshold: Optional[float] = None
+    high_threshold: Optional[float] = None
+    critical_threshold: Optional[float] = None
+    upi_id: Optional[str] = None
+    payment_mode: Optional[str] = None
+    contamination: Optional[float] = None
+    llm_model: Optional[str] = None
+
+
+class PaymentOverrideRequest(BaseModel):
+    action: str  # "APPROVE", "RELEASE_HOLD", "REJECT", "FLAG_FRAUD"
+    notes: Optional[str] = None
+
 
 router = APIRouter(prefix="/admin", tags=["Admin SOC"])
 
@@ -226,6 +244,50 @@ def get_payment_security_stats(db: Session = Depends(get_db), admin_user=Depends
     )
 
 
+@router.post("/payments/{payment_id}/override")
+def override_payment_status(
+    payment_id: int,
+    req: PaymentOverrideRequest,
+    db: Session = Depends(get_db),
+    admin_user=Depends(require_admin)
+):
+    payment = db.query(Payment).filter(Payment.id == payment_id).first()
+    if not payment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payment record not found.")
+
+    action_upper = req.action.upper()
+    if action_upper in ("APPROVE", "RELEASE_HOLD", "COMPLETED"):
+        payment.status = "COMPLETED"
+        payment.verification_required = False
+        if payment.order:
+            payment.order.status = "PROCESSING"
+            payment.order.payment_status = "PAID"
+    elif action_upper in ("REJECT", "CANCEL"):
+        payment.status = "REJECTED"
+        if payment.order:
+            payment.order.status = "CANCELLED"
+            payment.order.payment_status = "FAILED"
+    elif action_upper in ("FLAG_FRAUD", "HOLD", "FLAG"):
+        payment.status = "HELD"
+        payment.risk_level = "CRITICAL"
+        payment.verification_required = True
+        if payment.order:
+            payment.order.status = "HELD_SECURITY_REVIEW"
+
+    db.commit()
+    db.refresh(payment)
+
+    return {
+        "message": f"Payment #{payment_id} status updated to {payment.status} by SOC Admin.",
+        "payment": {
+            "id": payment.id,
+            "status": payment.status,
+            "risk_level": payment.risk_level,
+            "verification_required": payment.verification_required,
+        }
+    }
+
+
 @router.get("/graph", response_model=ApiFlowGraphResponse)
 def get_api_flow_graph(db: Session = Depends(get_db), admin_user=Depends(require_admin)):
     graph_builder.build_flow_graph(db, limit=1500)
@@ -237,6 +299,46 @@ def get_api_flow_graph(db: Session = Depends(get_db), admin_user=Depends(require
 @router.get("/apis")
 def get_telemetry_table(db: Session = Depends(get_db), admin_user=Depends(require_admin)):
     return logging_service.get_endpoint_telemetry(db)
+
+
+@router.get("/telemetry/export")
+def export_telemetry_data(db: Session = Depends(get_db), admin_user=Depends(require_admin)):
+    telemetry = logging_service.get_endpoint_telemetry(db)
+    logs = db.query(ApiLog).order_by(ApiLog.timestamp.desc()).limit(300).all()
+    threats = db.query(Threat).order_by(Threat.created_at.desc()).limit(100).all()
+
+    return {
+        "exported_at": datetime.datetime.utcnow().isoformat(),
+        "total_logs": len(logs),
+        "total_threats": len(threats),
+        "endpoints_monitored": len(telemetry),
+        "telemetry_summary": telemetry,
+        "recent_logs": [
+            {
+                "id": l.id,
+                "user_id": l.user_id,
+                "endpoint": l.endpoint,
+                "method": l.method,
+                "status_code": l.status_code,
+                "response_time": l.response_time,
+                "event_type": l.event_type,
+                "timestamp": l.timestamp.isoformat(),
+            }
+            for l in logs
+        ],
+        "threats": [
+            {
+                "id": t.id,
+                "endpoint": t.endpoint,
+                "threat_type": t.threat_type,
+                "risk_level": t.risk_level,
+                "anomaly_score": t.anomaly_score,
+                "status": t.status,
+                "created_at": t.created_at.isoformat(),
+            }
+            for t in threats
+        ]
+    }
 
 
 @router.get("/settings")
@@ -273,6 +375,44 @@ def get_admin_settings(admin_user=Depends(require_admin)):
     }
 
 
+@router.put("/settings")
+def update_admin_settings(
+    req: AdminSettingsUpdateRequest,
+    admin_user=Depends(require_admin)
+):
+    if req.medium_threshold is not None:
+        settings.RISK_THRESHOLD_MEDIUM = max(0.05, min(req.medium_threshold, 0.95))
+    if req.high_threshold is not None:
+        settings.RISK_THRESHOLD_HIGH = max(0.10, min(req.high_threshold, 0.98))
+    if req.critical_threshold is not None:
+        settings.RISK_THRESHOLD_CRITICAL = max(0.20, min(req.critical_threshold, 0.99))
+    if req.upi_id:
+        settings.UPI_ID = req.upi_id.strip()
+    if req.payment_mode:
+        settings.PAYMENT_MODE = req.payment_mode.lower().strip()
+    if req.contamination is not None:
+        settings.ISOLATION_FOREST_CONTAMINATION = max(0.01, min(req.contamination, 0.30))
+        detector.contamination = settings.ISOLATION_FOREST_CONTAMINATION
+        detector._initialize_baseline_model()
+    if req.llm_model:
+        settings.LLM_MODEL = req.llm_model.strip()
+
+    return {
+        "message": "Security & SOC platform settings updated successfully.",
+        "settings": {
+            "thresholds": {
+                "medium": settings.RISK_THRESHOLD_MEDIUM,
+                "high": settings.RISK_THRESHOLD_HIGH,
+                "critical": settings.RISK_THRESHOLD_CRITICAL,
+            },
+            "upi_id": settings.UPI_ID,
+            "payment_mode": settings.PAYMENT_MODE,
+            "contamination": settings.ISOLATION_FOREST_CONTAMINATION,
+            "llm_model": settings.LLM_MODEL,
+        }
+    }
+
+
 @router.get("/users")
 def list_users_for_admin(db: Session = Depends(get_db), admin_user=Depends(require_admin)):
     users = db.query(User).order_by(User.id.desc()).all()
@@ -301,6 +441,53 @@ def list_users_for_admin(db: Session = Depends(get_db), admin_user=Depends(requi
             "risk_level": risk_level,
         })
     return user_list
+
+
+@router.post("/users/{user_id}/toggle-status")
+def toggle_user_active_status(
+    user_id: int,
+    db: Session = Depends(get_db),
+    admin_user=Depends(require_admin)
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+
+    user.is_active = not user.is_active
+    db.commit()
+    db.refresh(user)
+
+    status_str = "Active" if user.is_active else "Blocked / Suspended"
+    return {
+        "message": f"User account for '{user.name}' ({user.email}) is now {status_str}.",
+        "user_id": user.id,
+        "is_active": user.is_active,
+    }
+
+
+@router.post("/users/{user_id}/reset-risk")
+def reset_user_risk_profile(
+    user_id: int,
+    db: Session = Depends(get_db),
+    admin_user=Depends(require_admin)
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+
+    # Mark all active threats for this user as mitigated
+    threats = db.query(Threat).filter(Threat.user_id == user.id, Threat.status == "ACTIVE").all()
+    for t in threats:
+        t.status = "MITIGATED"
+        t.action_taken = "RESET_BY_ADMIN"
+
+    db.commit()
+
+    return {
+        "message": f"Security risk profile for user '{user.name}' has been reset to LOW.",
+        "user_id": user.id,
+        "threats_mitigated": len(threats),
+    }
 
 
 @router.get("/users/{user_id}/investigate")
@@ -382,6 +569,18 @@ def investigate_user(user_id: int, db: Session = Depends(get_db), admin_user=Dep
 @router.get("/models/evaluate")
 def evaluate_models(admin_user=Depends(require_admin)):
     return evaluator.run_evaluation()
+
+
+@router.post("/models/retrain-isolation-forest")
+def trigger_isolation_forest_retraining(db: Session = Depends(get_db), admin_user=Depends(require_admin)):
+    detector._initialize_baseline_model()
+    return {
+        "message": "Isolation Forest baseline anomaly detector re-calibrated and fitted successfully.",
+        "contamination": settings.ISOLATION_FOREST_CONTAMINATION,
+        "n_estimators": 120,
+        "is_fitted": detector.is_fitted,
+        "status": "ACTIVE & FITTED",
+    }
 
 
 @router.post("/models/train-gnn")

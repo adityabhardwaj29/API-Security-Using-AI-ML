@@ -32,6 +32,7 @@ export const ThreatDetail = () => {
   const [loading, setLoading] = useState(true);
   const [actionNotes, setActionNotes] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
+  const [actionSuccessMsg, setActionSuccessMsg] = useState(null);
   const [showWhyFlagged, setShowWhyFlagged] = useState(false);
   const [activeStepTab, setActiveStepTab] = useState('summary');
 
@@ -56,18 +57,38 @@ export const ThreatDetail = () => {
 
   const handleAction = async (action) => {
     setIsUpdating(true);
+    setActionSuccessMsg(null);
     try {
-      await api.post(`/threats/${id}/action`, {
+      const res = await api.post(`/threats/${id}/action`, {
         action,
-        notes: actionNotes || 'SOC action applied.',
+        notes: actionNotes || `SOC ${action} action applied by analyst.`,
       });
+      setActionSuccessMsg(`Action '${action}' applied successfully. Status updated to ${res.data.status}.`);
       await fetchThreat();
       setActionNotes('');
+      setTimeout(() => setActionSuccessMsg(null), 4500);
     } catch (err) {
       console.error(err);
     } finally {
       setIsUpdating(false);
     }
+  };
+
+  const handleExportInvestigation = () => {
+    const dataToExport = {
+      threat,
+      investigation,
+      exported_at: new Date().toISOString(),
+    };
+    const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(
+      JSON.stringify(dataToExport, null, 2)
+    )}`;
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute('href', jsonString);
+    downloadAnchor.setAttribute('download', `threat_investigation_SEC_${threat?.id || 'dossier'}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
   };
 
   if (loading) {
@@ -90,6 +111,25 @@ export const ThreatDetail = () => {
 
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', paddingBottom: '4rem' }}>
+      {/* Action Success Toast */}
+      {actionSuccessMsg && (
+        <div style={{
+          padding: '0.85rem 1.25rem',
+          borderRadius: 'var(--radius-md)',
+          background: '#ecfdf5',
+          border: '1px solid #a7f3d0',
+          color: '#065f46',
+          marginBottom: '1.5rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          fontSize: '0.875rem',
+        }}>
+          <CheckCircle2 size={18} />
+          <span>{actionSuccessMsg}</span>
+        </div>
+      )}
+
       {/* Top Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.75rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -131,6 +171,14 @@ export const ThreatDetail = () => {
             <HelpCircle size={16} /> Why was this flagged?
           </button>
           <button
+            onClick={handleExportInvestigation}
+            className="btn btn-secondary btn-sm"
+            style={{ background: '#ffffff', borderColor: '#e2e8f0', color: '#0066ff' }}
+            title="Export full threat report"
+          >
+            Export Dossier (JSON)
+          </button>
+          <button
             onClick={() => handleAction('ACKNOWLEDGE')}
             className="btn btn-secondary btn-sm"
             style={{ background: '#ffffff', borderColor: '#e2e8f0', color: '#0f172a' }}
@@ -152,6 +200,16 @@ export const ThreatDetail = () => {
           >
             Resolve Threat
           </button>
+          {threat.user_id && (
+            <button
+              onClick={() => handleAction('BLOCK_USER')}
+              className="btn btn-danger btn-sm"
+              disabled={isUpdating}
+              title="Suspend attacker account"
+            >
+              Block Identity
+            </button>
+          )}
         </div>
       </div>
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Cpu, Play, CheckCircle2, AlertCircle, RefreshCw, BarChart2, ShieldCheck, Activity } from 'lucide-react';
+import { Cpu, Play, CheckCircle2, AlertCircle, RefreshCw, BarChart2, ShieldCheck, Activity, RotateCcw, Zap } from 'lucide-react';
 import api from '../../services/api';
 
 export const ModelHub = () => {
@@ -8,6 +8,8 @@ export const ModelHub = () => {
   const [evaluating, setEvaluating] = useState(false);
   const [trainingGNN, setTrainingGNN] = useState(false);
   const [gnnTrainResult, setGnnTrainResult] = useState(null);
+  const [trainingIF, setTrainingIF] = useState(false);
+  const [ifTrainResult, setIfTrainResult] = useState(null);
 
   const fetchEvaluation = async () => {
     try {
@@ -38,6 +40,7 @@ export const ModelHub = () => {
 
   const handleTrainGNN = async () => {
     setTrainingGNN(true);
+    setGnnTrainResult(null);
     try {
       const res = await api.post('/admin/models/train-gnn');
       setGnnTrainResult(res.data);
@@ -49,29 +52,53 @@ export const ModelHub = () => {
     }
   };
 
+  const handleRetrainIsolationForest = async () => {
+    setTrainingIF(true);
+    setIfTrainResult(null);
+    try {
+      const res = await api.post('/admin/models/retrain-isolation-forest');
+      setIfTrainResult(res.data);
+      await fetchEvaluation();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setTrainingIF(false);
+    }
+  };
+
   return (
-    <div>
-      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+    <div style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto' }}>
+      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '2rem' }}>
         <div>
           <span style={{ fontSize: '0.75rem', fontWeight: '800', color: '#0066ff', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-            Machine Learning & Graph Intelligence
+            Machine Learning & Graph Intelligence Hub
           </span>
           <h1 className="page-title" style={{ fontSize: '1.875rem', fontWeight: '800', color: '#0f172a', letterSpacing: '-0.02em', marginTop: '0.2rem' }}>
             AI/ML & PyTorch GNN Research Center
           </h1>
           <p className="page-subtitle" style={{ color: '#64748b' }}>
-            Real scientific benchmark comparisons across Rule-based, Isolation Forest, and PyTorch GNN architectures
+            Live scientific benchmark comparisons across Rule-based heuristics, Isolation Forest ensembles, and PyTorch GNN architectures.
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <button
+            onClick={handleRetrainIsolationForest}
+            className="btn btn-secondary btn-sm"
+            disabled={trainingIF}
+            style={{ background: '#ffffff', borderColor: '#e2e8f0', color: '#059669' }}
+          >
+            <RotateCcw size={14} className={trainingIF ? 'animate-spin' : ''} />
+            <span>{trainingIF ? 'Calibrating...' : 'Retrain Isolation Forest'}</span>
+          </button>
+
           <button
             onClick={handleTrainGNN}
             className="btn btn-secondary btn-sm"
             disabled={trainingGNN}
             style={{ background: '#ffffff', borderColor: '#e2e8f0', color: '#0066ff' }}
           >
-            <Cpu size={14} />
+            <Cpu size={14} className={trainingGNN ? 'animate-spin' : ''} />
             <span>{trainingGNN ? 'Training GNN...' : 'Train PyTorch GNN Model'}</span>
           </button>
 
@@ -80,12 +107,36 @@ export const ModelHub = () => {
             className="btn btn-primary btn-sm"
             disabled={evaluating}
           >
-            <Play size={14} />
+            <Play size={14} className={evaluating ? 'animate-spin' : ''} />
             <span>{evaluating ? 'Running Tests...' : 'Run Benchmark Evaluation'}</span>
           </button>
         </div>
       </div>
 
+      {/* Isolation Forest Notification */}
+      {ifTrainResult && (
+        <div style={{
+          padding: '1rem 1.25rem',
+          background: '#ecfdf5',
+          border: '1px solid #a7f3d0',
+          borderRadius: 'var(--radius-md)',
+          color: '#065f46',
+          marginBottom: '1.5rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.75rem',
+        }}>
+          <CheckCircle2 size={20} color="#059669" />
+          <div>
+            <div style={{ fontWeight: '800', color: '#065f46' }}>{ifTrainResult.message}</div>
+            <div style={{ fontSize: '0.8rem', color: '#047857', marginTop: '0.2rem' }}>
+              Ensemble: <strong>{ifTrainResult.n_estimators} Trees</strong> • Contamination: <strong>{ifTrainResult.contamination}</strong> • Status: <strong>{ifTrainResult.status}</strong>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* GNN Notification */}
       {gnnTrainResult && (
         <div style={{
           padding: '1rem 1.25rem',
@@ -110,7 +161,7 @@ export const ModelHub = () => {
 
       {/* Model Benchmark Table */}
       <div className="card" style={{ marginBottom: '2rem', background: '#ffffff', borderColor: '#e2e8f0', boxShadow: '0 4px 12px rgba(15,23,42,0.04)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
           <div>
             <h3 style={{ fontSize: '1.15rem', fontWeight: '800', color: '#0f172a' }}>
               Academic & Real-World Detection Metrics
@@ -202,3 +253,5 @@ export const ModelHub = () => {
     </div>
   );
 };
+
+export default ModelHub;

@@ -125,15 +125,28 @@ def update_threat_action(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Threat not found.")
 
     action_upper = req.action.upper()
-    if action_upper == "ACKNOWLEDGE":
+    if action_upper in ("ACKNOWLEDGE", "ACK"):
         t.status = "ACKNOWLEDGED"
         t.action_taken = "SOC_ANALYST_ACKNOWLEDGED"
-    elif action_upper == "MITIGATE":
+    elif action_upper in ("MITIGATE", "RESOLVE", "RESOLVED"):
         t.status = "MITIGATED"
         t.action_taken = "SECURITY_CONTROLS_APPLIED"
-    elif action_upper == "FALSE_POSITIVE":
+    elif action_upper in ("CHALLENGE_MFA", "CHALLENGE"):
+        t.status = "CHALLENGED"
+        t.action_taken = "MFA_STEP_UP_CHALLENGE_ISSUED"
+    elif action_upper in ("BLOCK_USER", "BLOCK", "SUSPEND"):
+        t.status = "BLOCKED"
+        t.action_taken = "CLIENT_IDENTITY_BLOCKED"
+        if t.user_id:
+            user_rec = db.query(User).filter(User.id == t.user_id).first()
+            if user_rec:
+                user_rec.is_active = False
+    elif action_upper in ("FALSE_POSITIVE", "IGNORE"):
         t.status = "FALSE_POSITIVE"
         t.action_taken = "MARKED_FALSE_POSITIVE"
+    else:
+        t.status = "ACKNOWLEDGED"
+        t.action_taken = f"SOC_ACTION_{action_upper}"
 
     if req.notes:
         t.details = f"{t.details or ''} | Analyst Notes: {req.notes}".strip(" |")
