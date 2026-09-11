@@ -428,7 +428,7 @@ def get_payment_detail_for_admin(
         "order": {
             "id": order.id if order else payment.order_id,
             "status": order.status if order else "CONFIRMED",
-            "total_amount": order.total_amount if order else payment.amount,
+            "total_amount": getattr(order, 'final_amount', getattr(order, 'subtotal', payment.amount)) if order else payment.amount,
         } if (order or payment.order_id) else None,
         "verification": {
             "status": payment.verification_status,
