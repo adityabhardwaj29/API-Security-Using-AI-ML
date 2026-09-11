@@ -47,6 +47,8 @@ class PaymentOverrideRequest(BaseModel):
     notes: Optional[str] = None
 
 
+from backend.app.models.security_event import SecurityEvent
+
 router = APIRouter(prefix="/admin", tags=["Admin SOC"])
 
 
@@ -57,6 +59,18 @@ def get_admin_overview_stats(db: Session = Depends(get_db), admin_user=Depends(r
     total_logs = db.query(func.count(ApiLog.id)).scalar() or 0
     payment_events = db.query(func.count(ApiLog.id)).filter(
         (ApiLog.event_type == "PAYMENT") | (ApiLog.endpoint.like("%/payment%"))
+    ).scalar() or 0
+
+    # New users registered today (since midnight UTC)
+    today_start = datetime.datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    new_users_today = db.query(func.count(User.id)).filter(User.created_at >= today_start).scalar() or 0
+
+    # Payment KPIs
+    successful_payments = db.query(func.count(Payment.id)).filter(Payment.status.in_(["COMPLETED", "PAID"])).scalar() or 0
+    pending_payments = db.query(func.count(Payment.id)).filter(Payment.status.in_(["PENDING", "HELD", "VERIFICATION_REQUIRED"])).scalar() or 0
+    failed_payments = db.query(func.count(Payment.id)).filter(Payment.status.in_(["FAILED", "REJECTED"])).scalar() or 0
+    payment_security_alerts = db.query(func.count(Threat.id)).filter(
+        (Threat.event_type == "PAYMENT") | (Threat.endpoint.like("%/payment%"))
     ).scalar() or 0
 
     # Risk breakdown from threats
@@ -105,6 +119,21 @@ def get_admin_overview_stats(db: Session = Depends(get_db), admin_user=Depends(r
             )
         )
 
+    # Recent user registrations query (real DB backed)
+    recent_users = db.query(User).order_by(User.created_at.desc()).limit(8).all()
+    recent_registrations = [
+        {
+            "id": u.id,
+            "name": u.name,
+            "email": u.email,
+            "phone": u.phone or "N/A",
+            "role": u.role,
+            "status": "Active" if u.is_active else "Suspended",
+            "created_at": u.created_at.isoformat(),
+        }
+        for u in recent_users
+    ]
+
     # Traffic trend (windowed breakdown)
     recent_logs = db.query(ApiLog).order_by(ApiLog.timestamp.desc()).limit(200).all()
     trend_buckets: Dict[str, Dict[str, int]] = {}
@@ -127,17 +156,23 @@ def get_admin_overview_stats(db: Session = Depends(get_db), admin_user=Depends(r
 
     return AdminOverviewStats(
         total_users=total_users,
+        new_users_today=new_users_today,
         total_api_requests=total_logs,
         normal_events=normal_events,
         suspicious_events=suspicious_events,
         high_risk_events=high_risk_events,
         critical_events=critical_events,
         payment_events=payment_events,
+        successful_payments=successful_payments,
+        pending_payments=pending_payments,
+        failed_payments=failed_payments,
+        payment_security_alerts=payment_security_alerts,
         active_threats_count=active_threats_count,
         average_system_risk=0.18 if total_threats == 0 else min(round(0.2 + (total_threats / max(total_logs, 1)), 2), 0.95),
         gnn_status=gnn_engine.status,
         ml_status="TRAINED" if detector.is_fitted else "INITIALIZING",
         recent_threats=recent_threats_data,
+        recent_registrations=recent_registrations,
         traffic_trend=traffic_trend,
         risk_distribution={
             "LOW": normal_events + low_risk,
@@ -218,6 +253,10 @@ def get_payment_security_stats(db: Session = Depends(get_db), admin_user=Depends
             "risk_score": p.risk_score,
             "risk_level": p.risk_level,
             "transaction_reference": p.transaction_reference,
+            "provider_transaction_id": p.provider_transaction_id or f"TXN-{p.id:06d}",
+            "provider_reference": p.provider_reference or f"REF-{p.id:06d}",
+            "verification_status": p.verification_status,
+            "verification_source": p.verification_source,
             "upi_id": p.upi_id or settings.UPI_ID,
             "is_demo": p.is_demo,
             "created_at": p.created_at.isoformat(),
@@ -258,17 +297,22 @@ def override_payment_status(
     action_upper = req.action.upper()
     if action_upper in ("APPROVE", "RELEASE_HOLD", "COMPLETED"):
         payment.status = "COMPLETED"
+        payment.verification_status = "verified"
         payment.verification_required = False
+        payment.verified_at = datetime.datetime.utcnow()
         if payment.order:
             payment.order.status = "PROCESSING"
             payment.order.payment_status = "PAID"
     elif action_upper in ("REJECT", "CANCEL"):
         payment.status = "REJECTED"
+        payment.verification_status = "failed"
+        payment.failed_at = datetime.datetime.utcnow()
         if payment.order:
             payment.order.status = "CANCELLED"
             payment.order.payment_status = "FAILED"
     elif action_upper in ("FLAG_FRAUD", "HOLD", "FLAG"):
         payment.status = "HELD"
+        payment.verification_status = "verification_required"
         payment.risk_level = "CRITICAL"
         payment.verification_required = True
         if payment.order:
@@ -286,6 +330,254 @@ def override_payment_status(
             "verification_required": payment.verification_required,
         }
     }
+
+
+@router.get("/payments/{payment_id}")
+def get_payment_detail_for_admin(
+    payment_id: int,
+    db: Session = Depends(get_db),
+    admin_user=Depends(require_admin)
+):
+    payment = db.query(Payment).filter(Payment.id == payment_id).first()
+    if not payment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payment record not found.")
+
+    user = payment.user
+    order = payment.order
+
+    # Check for security threats/events associated with this user/payment
+    related_threat = db.query(Threat).filter(
+        (Threat.user_id == payment.user_id) & 
+        ((Threat.event_type == "PAYMENT") | (Threat.endpoint.like("%/payment%")))
+    ).order_by(Threat.created_at.desc()).first()
+
+    timeline = [
+        {
+            "time": (payment.initiated_at or payment.created_at).strftime("%H:%M:%S"),
+            "timestamp": (payment.initiated_at or payment.created_at).isoformat(),
+            "event": "Order & Payment Initiated",
+            "detail": f"Transaction reference {payment.transaction_reference or 'TXN'} registered"
+        }
+    ]
+
+    if payment.status in ("COMPLETED", "VERIFIED") or payment.verified_at:
+        v_time = payment.verified_at or payment.created_at
+        timeline.append({
+            "time": v_time.strftime("%H:%M:%S"),
+            "timestamp": v_time.isoformat(),
+            "event": "Payment Verified",
+            "detail": f"Server-side verification confirmed via {payment.verification_source} (Mode: {'DEMO' if payment.is_demo else 'REAL'})"
+        })
+    elif payment.status in ("HELD", "VERIFICATION_REQUIRED"):
+        timeline.append({
+            "time": payment.created_at.strftime("%H:%M:%S"),
+            "timestamp": payment.created_at.isoformat(),
+            "event": "Security Verification Hold",
+            "detail": "Behavioral anomaly threshold exceeded. Step-up identity challenge issued."
+        })
+    elif payment.status in ("FAILED", "REJECTED") or payment.failed_at:
+        f_time = payment.failed_at or payment.created_at
+        timeline.append({
+            "time": f_time.strftime("%H:%M:%S"),
+            "timestamp": f_time.isoformat(),
+            "event": "Payment Failed / Rejected",
+            "detail": "Transaction verification failed or rejected by security rules."
+        })
+
+    timeline.append({
+        "time": payment.created_at.strftime("%H:%M:%S"),
+        "timestamp": payment.created_at.isoformat(),
+        "event": "Risk Engine & ML Pipeline Analysis",
+        "detail": f"Risk Score: {int(payment.risk_score * 100)}/100 ({payment.risk_level}) - Multi-Signal behavioral fusion"
+    })
+
+    timeline.append({
+        "time": payment.created_at.strftime("%H:%M:%S"),
+        "timestamp": payment.created_at.isoformat(),
+        "event": "Security Decision Logged",
+        "detail": f"Audit record created with status {payment.status}"
+    })
+
+    return {
+        "payment": {
+            "id": payment.id,
+            "order_id": payment.order_id,
+            "user_id": payment.user_id,
+            "amount": payment.amount,
+            "currency": payment.currency,
+            "payment_method": payment.payment_method,
+            "status": payment.status,
+            "provider": payment.provider,
+            "provider_transaction_id": payment.provider_transaction_id or f"TXN-{payment.id:06d}",
+            "provider_reference": payment.provider_reference or f"REF-{payment.id:06d}",
+            "transaction_reference": payment.transaction_reference,
+            "upi_id": payment.upi_id or settings.UPI_ID,
+            "is_demo": payment.is_demo,
+            "created_at": payment.created_at.isoformat(),
+            "initiated_at": (payment.initiated_at or payment.created_at).isoformat(),
+            "verified_at": payment.verified_at.isoformat() if payment.verified_at else None,
+            "failed_at": payment.failed_at.isoformat() if payment.failed_at else None,
+        },
+        "user": {
+            "id": user.id if user else payment.user_id,
+            "name": user.name if user else "Anonymous User",
+            "email": user.email if user else "N/A",
+            "phone": user.phone if user else "N/A",
+            "role": user.role if user else "USER",
+        },
+        "order": {
+            "id": order.id if order else payment.order_id,
+            "status": order.status if order else "CONFIRMED",
+            "total_amount": order.total_amount if order else payment.amount,
+        } if (order or payment.order_id) else None,
+        "verification": {
+            "status": payment.verification_status,
+            "source": payment.verification_source,
+            "mode": "DEMO" if payment.is_demo else "REAL",
+            "verified_at": payment.verified_at.isoformat() if payment.verified_at else None,
+            "is_auto_verified": payment.verification_status == "verified",
+        },
+        "security": {
+            "risk_score": payment.risk_score,
+            "risk_level": payment.risk_level,
+            "threat_id": related_threat.id if related_threat else None,
+            "threat_type": related_threat.threat_type if related_threat else None,
+            "why_flagged": related_threat.details if related_threat else "Clean behavioral transaction pattern",
+        },
+        "timeline": timeline,
+    }
+
+
+@router.get("/threats", response_model=List[ThreatResponse])
+def list_threats_for_admin(
+    risk_level: Optional[str] = Query(None),
+    status_filter: Optional[str] = Query(None, alias="status"),
+    user_id: Optional[int] = Query(None),
+    limit: int = Query(50, le=150),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+    admin_user=Depends(require_admin)
+):
+    query = db.query(Threat)
+    if risk_level:
+        query = query.filter(Threat.risk_level == risk_level.upper())
+    if status_filter:
+        query = query.filter(Threat.status == status_filter.upper())
+    if user_id:
+        query = query.filter(Threat.user_id == user_id)
+
+    threats = query.order_by(Threat.created_at.desc()).offset(offset).limit(limit).all()
+
+    result = []
+    for t in threats:
+        exp_data = None
+        if t.explanation:
+            exp_data = ExplanationResponse(
+                id=t.explanation.id,
+                threat_id=t.explanation.threat_id,
+                method=t.explanation.method,
+                important_features=[FeatureAttribution(**feat) for feat in t.explanation.important_features],
+                explanation=t.explanation.explanation,
+                recommendation=t.explanation.recommendation,
+                llm_model=t.explanation.llm_model,
+                created_at=t.explanation.created_at,
+            )
+
+        result.append(
+            ThreatResponse(
+                id=t.id,
+                user_id=t.user_id,
+                endpoint=t.endpoint,
+                event_type=t.event_type,
+                threat_type=t.threat_type,
+                anomaly_score=t.anomaly_score,
+                confidence=t.confidence,
+                risk_level=t.risk_level,
+                status=t.status,
+                action_taken=t.action_taken,
+                details=t.details,
+                created_at=t.created_at,
+                user=t.user,
+                explanation=exp_data,
+            )
+        )
+    return result
+
+
+@router.get("/threats/{threat_id}", response_model=ThreatResponse)
+def get_threat_for_admin(
+    threat_id: int,
+    db: Session = Depends(get_db),
+    admin_user=Depends(require_admin)
+):
+    t = db.query(Threat).filter(Threat.id == threat_id).first()
+    if not t:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Threat not found.")
+
+    exp_data = None
+    if t.explanation:
+        exp_data = ExplanationResponse(
+            id=t.explanation.id,
+            threat_id=t.explanation.threat_id,
+            method=t.explanation.method,
+            important_features=[FeatureAttribution(**feat) for feat in t.explanation.important_features],
+            explanation=t.explanation.explanation,
+            recommendation=t.explanation.recommendation,
+            llm_model=t.explanation.llm_model,
+            created_at=t.explanation.created_at,
+        )
+
+    return ThreatResponse(
+        id=t.id,
+        user_id=t.user_id,
+        endpoint=t.endpoint,
+        event_type=t.event_type,
+        threat_type=t.threat_type,
+        anomaly_score=t.anomaly_score,
+        confidence=t.confidence,
+        risk_level=t.risk_level,
+        status=t.status,
+        action_taken=t.action_taken,
+        details=t.details,
+        created_at=t.created_at,
+        user=t.user,
+        explanation=exp_data,
+    )
+
+
+@router.get("/security/events")
+def list_security_events(
+    limit: int = Query(50, le=150),
+    offset: int = Query(0, ge=0),
+    event_type: Optional[str] = Query(None),
+    severity: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    admin_user=Depends(require_admin)
+):
+    query = db.query(SecurityEvent)
+    if event_type:
+        query = query.filter(SecurityEvent.event_type == event_type.upper())
+    if severity:
+        query = query.filter(SecurityEvent.severity == severity.upper())
+
+    events = query.order_by(SecurityEvent.created_at.desc()).offset(offset).limit(limit).all()
+
+    return [
+        {
+            "id": e.id,
+            "user_id": e.user_id,
+            "user_name": e.user.name if e.user else "Anonymous User",
+            "event_type": e.event_type,
+            "severity": e.severity,
+            "risk_score": e.risk_score,
+            "message": e.message,
+            "source_ip": e.source_ip,
+            "endpoint": e.endpoint,
+            "created_at": e.created_at.isoformat(),
+        }
+        for e in events
+    ]
+
 
 
 @router.get("/graph", response_model=ApiFlowGraphResponse)
@@ -490,6 +782,7 @@ def reset_user_risk_profile(
     }
 
 
+@router.get("/users/{user_id}")
 @router.get("/users/{user_id}/investigate")
 def investigate_user(user_id: int, db: Session = Depends(get_db), admin_user=Depends(require_admin)):
     user = db.query(User).filter(User.id == user_id).first()

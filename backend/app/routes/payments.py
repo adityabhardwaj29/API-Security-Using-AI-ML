@@ -5,7 +5,7 @@ from backend.app.config import settings
 from backend.app.database import get_db
 from backend.app.models.user import User
 from backend.app.models.payment import Payment
-from backend.app.schemas.payment import PaymentRequest, PaymentResponse
+from backend.app.schemas.payment import PaymentRequest, PaymentResponse, PaymentWebhookRequest
 from backend.app.security.permissions import require_user
 from backend.app.services.payment_service import payment_service
 
@@ -47,6 +47,13 @@ def create_payment(
         payment_status=payment.payment_status,
         payment_method=payment.payment_method,
         provider=payment.provider,
+        provider_transaction_id=payment.provider_transaction_id,
+        provider_reference=payment.provider_reference,
+        verification_status=payment.verification_status,
+        verification_source=payment.verification_source,
+        initiated_at=payment.initiated_at,
+        verified_at=payment.verified_at,
+        failed_at=payment.failed_at,
         risk_score=payment.risk_score,
         risk_level=payment.risk_level,
         verification_required=payment.verification_required,
@@ -56,6 +63,25 @@ def create_payment(
         upi_qr_payload=result.get("upi_qr_payload"),
         message=result["message"],
         created_at=payment.created_at,
+    )
+
+
+@router.post("/webhook")
+def process_payment_webhook(
+    req: PaymentWebhookRequest,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Idempotent payment webhook endpoint for real payment gateways.
+    Duplicate provider_transaction_id submissions return existing payment status
+    without duplicate database entries.
+    """
+    ip = request.client.host if request.client else "127.0.0.1"
+    return payment_service.process_webhook(
+        db=db,
+        webhook_data=req.model_dump(),
+        ip_address=ip
     )
 
 
@@ -97,6 +123,13 @@ def verify_held_payment(
         payment_status=payment.payment_status,
         payment_method=payment.payment_method,
         provider=payment.provider,
+        provider_transaction_id=payment.provider_transaction_id,
+        provider_reference=payment.provider_reference,
+        verification_status=payment.verification_status,
+        verification_source=payment.verification_source,
+        initiated_at=payment.initiated_at,
+        verified_at=payment.verified_at,
+        failed_at=payment.failed_at,
         risk_score=payment.risk_score,
         risk_level=payment.risk_level,
         verification_required=payment.verification_required,
@@ -129,6 +162,13 @@ def get_payment_history(
             payment_status=p.payment_status,
             payment_method=p.payment_method,
             provider=p.provider,
+            provider_transaction_id=p.provider_transaction_id,
+            provider_reference=p.provider_reference,
+            verification_status=p.verification_status,
+            verification_source=p.verification_source,
+            initiated_at=p.initiated_at,
+            verified_at=p.verified_at,
+            failed_at=p.failed_at,
             risk_score=p.risk_score,
             risk_level=p.risk_level,
             verification_required=p.verification_required,
@@ -163,6 +203,13 @@ def get_payment_by_id(
         payment_status=p.payment_status,
         payment_method=p.payment_method,
         provider=p.provider,
+        provider_transaction_id=p.provider_transaction_id,
+        provider_reference=p.provider_reference,
+        verification_status=p.verification_status,
+        verification_source=p.verification_source,
+        initiated_at=p.initiated_at,
+        verified_at=p.verified_at,
+        failed_at=p.failed_at,
         risk_score=p.risk_score,
         risk_level=p.risk_level,
         verification_required=p.verification_required,

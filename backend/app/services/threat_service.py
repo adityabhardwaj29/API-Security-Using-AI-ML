@@ -99,7 +99,8 @@ class ThreatService:
         threat_payload = {
             "id": threat.id,
             "user_id": user_id,
-            "user_email": user_obj.email if user_obj else "Anonymous / Unknown",
+            "user_name": user_obj.name if user_obj else "Anonymous User",
+            "user_email": user_obj.email if user_obj else "guest@session",
             "endpoint": threat.endpoint,
             "event_type": threat.event_type,
             "threat_type": threat.threat_type,

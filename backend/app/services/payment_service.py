@@ -64,11 +64,13 @@ class PaymentService:
         is_threat = evaluation["is_threat"]
 
         # 3. Handle Step-Up Verification / Threat Hold
+        now = datetime.datetime.utcnow()
         if is_threat or risk_level in ("HIGH", "CRITICAL"):
             # Check if user successfully provided step-up challenge response
             if verification_code and verification_code.strip() == "123456":
                 # Verified after security challenge
                 txn_ref = f"UPI-VERIFIED-{uuid.uuid4().hex[:8].upper()}"
+                provider_tx_id = f"TXN-{uuid.uuid4().hex[:12].upper()}"
                 payment = Payment(
                     order_id=order_id,
                     user_id=user_id,
@@ -78,13 +80,19 @@ class PaymentService:
                     payment_status="COMPLETED",
                     status="COMPLETED",
                     provider=settings.PAYMENT_PROVIDER,
+                    provider_transaction_id=provider_tx_id,
+                    provider_reference=f"REF-{uuid.uuid4().hex[:8].upper()}",
                     transaction_reference=txn_ref,
                     upi_id=target_upi,
+                    verification_status="verified",
+                    verification_source="demo" if is_demo else "provider_api",
                     risk_score=risk_score,
                     risk_level=risk_level,
                     verification_required=False,
                     is_demo=is_demo,
-                    created_at=datetime.datetime.utcnow(),
+                    initiated_at=now,
+                    verified_at=now,
+                    created_at=now,
                 )
                 db.add(payment)
 
@@ -105,7 +113,7 @@ class PaymentService:
                     message=f"UPI payment of ₹{amount:,.2f} completed successfully after step-up verification ({txn_ref})",
                     source_ip=ip_address,
                     endpoint="/api/payments/verify",
-                    created_at=datetime.datetime.utcnow(),
+                    created_at=now,
                 )
                 db.add(sec_event)
                 db.commit()
@@ -134,6 +142,7 @@ class PaymentService:
 
             status_label = "VERIFICATION_REQUIRED" if risk_level == "HIGH" else "HELD"
             temp_ref = f"UPI-HOLD-{uuid.uuid4().hex[:8].upper()}"
+            provider_tx_id = f"TXN-HOLD-{uuid.uuid4().hex[:10].upper()}"
 
             payment = Payment(
                 order_id=order_id,
@@ -144,13 +153,18 @@ class PaymentService:
                 payment_status=status_label,
                 status=status_label,
                 provider=settings.PAYMENT_PROVIDER,
+                provider_transaction_id=provider_tx_id,
+                provider_reference=f"REF-{uuid.uuid4().hex[:8].upper()}",
                 transaction_reference=temp_ref,
                 upi_id=target_upi,
+                verification_status="verification_required",
+                verification_source="demo" if is_demo else "provider_api",
                 risk_score=risk_score,
                 risk_level=risk_level,
                 verification_required=True,
                 is_demo=is_demo,
-                created_at=datetime.datetime.utcnow(),
+                initiated_at=now,
+                created_at=now,
             )
             db.add(payment)
             db.commit()
@@ -169,6 +183,7 @@ class PaymentService:
         # 4. Normal / Low / Medium Risk -> Process payment smoothly
         txn_prefix = "UPI-DEMO" if is_demo else "UPI-LIVE"
         txn_ref = f"{txn_prefix}-{uuid.uuid4().hex[:8].upper()}"
+        provider_tx_id = f"TXN-{uuid.uuid4().hex[:12].upper()}"
 
         payment = Payment(
             order_id=order_id,
@@ -179,13 +194,19 @@ class PaymentService:
             payment_status="COMPLETED",
             status="COMPLETED",
             provider=settings.PAYMENT_PROVIDER,
+            provider_transaction_id=provider_tx_id,
+            provider_reference=f"REF-{uuid.uuid4().hex[:8].upper()}",
             transaction_reference=txn_ref,
             upi_id=target_upi,
+            verification_status="verified",
+            verification_source="demo" if is_demo else "provider_api",
             risk_score=risk_score,
             risk_level=risk_level,
             verification_required=False,
             is_demo=is_demo,
-            created_at=datetime.datetime.utcnow(),
+            initiated_at=now,
+            verified_at=now,
+            created_at=now,
         )
         db.add(payment)
 
@@ -208,7 +229,7 @@ class PaymentService:
             message=f"UPI payment of ₹{amount:,.2f}{demo_tag} processed successfully ({txn_ref})",
             source_ip=ip_address,
             endpoint="/api/payments",
-            created_at=datetime.datetime.utcnow(),
+            created_at=now,
         )
         db.add(sec_event)
         db.commit()
@@ -224,5 +245,103 @@ class PaymentService:
             "upi_qr_payload": self.generate_upi_qr_payload(amount, txn_ref, target_upi),
         }
 
+    def process_webhook(
+        self,
+        db: Session,
+        webhook_data: Dict[str, Any],
+        ip_address: str = "127.0.0.1"
+    ) -> Dict[str, Any]:
+        """
+        Processes payment gateway webhook with idempotency check on provider_transaction_id.
+        Prevents duplicate payments if provider dispatches repeated webhook events.
+        """
+        provider_tx_id = webhook_data.get("provider_transaction_id")
+        if not provider_tx_id:
+            raise ValueError("Missing provider_transaction_id in webhook payload.")
+
+        # IDEMPOTENCY CHECK:
+        existing = db.query(Payment).filter(Payment.provider_transaction_id == provider_tx_id).first()
+        if existing:
+            return {
+                "status": "success",
+                "message": "Webhook already processed (idempotent).",
+                "idempotent": True,
+                "payment_id": existing.id,
+                "payment_status": existing.status,
+                "transaction_reference": existing.transaction_reference,
+            }
+
+        now = datetime.datetime.utcnow()
+        webhook_status = webhook_data.get("status", "SUCCESS").upper()
+        amount = float(webhook_data.get("amount", 0.0))
+        order_id = webhook_data.get("order_id")
+        user_id = webhook_data.get("user_id") or 1
+        currency = webhook_data.get("currency", "INR")
+        upi_id = webhook_data.get("upi_id") or settings.UPI_ID
+
+        # Determine success / failure
+        is_success = webhook_status in ("SUCCESS", "COMPLETED", "PAID")
+        final_status = "COMPLETED" if is_success else "FAILED"
+        verification_status = "verified" if is_success else "failed"
+
+        txn_ref = f"UPI-HOOK-{uuid.uuid4().hex[:8].upper()}"
+
+        payment = Payment(
+            order_id=order_id,
+            user_id=user_id,
+            amount=amount,
+            currency=currency,
+            payment_method="UPI",
+            payment_status=final_status,
+            status=final_status,
+            provider=settings.PAYMENT_PROVIDER,
+            provider_transaction_id=provider_tx_id,
+            provider_reference=webhook_data.get("provider_reference") or f"WH-{uuid.uuid4().hex[:6].upper()}",
+            transaction_reference=txn_ref,
+            upi_id=upi_id,
+            verification_status=verification_status,
+            verification_source="provider_webhook",
+            risk_score=0.05 if is_success else 0.45,
+            risk_level="LOW" if is_success else "MEDIUM",
+            verification_required=False,
+            is_demo=False,
+            initiated_at=now,
+            verified_at=now if is_success else None,
+            failed_at=now if not is_success else None,
+            created_at=now,
+        )
+        db.add(payment)
+
+        if order_id:
+            order = db.query(Order).filter(Order.id == order_id).first()
+            if order:
+                order.status = "CONFIRMED" if is_success else "FAILED"
+
+        # Security Audit Log
+        sec_event = SecurityEvent(
+            user_id=user_id,
+            event_type="PAYMENT_WEBHOOK",
+            severity="INFO" if is_success else "WARNING",
+            risk_score=0.05 if is_success else 0.45,
+            message=f"Webhook verification processed for {provider_tx_id} - Status: {final_status}",
+            source_ip=ip_address,
+            endpoint="/api/payments/webhook",
+            created_at=now,
+        )
+        db.add(sec_event)
+        db.commit()
+        db.refresh(payment)
+
+        return {
+            "status": "success",
+            "message": "Payment verified via webhook.",
+            "idempotent": False,
+            "payment_id": payment.id,
+            "payment_status": payment.status,
+            "verification_status": payment.verification_status,
+            "transaction_reference": payment.transaction_reference,
+        }
+
 
 payment_service = PaymentService()
+

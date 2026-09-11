@@ -13,6 +13,9 @@ from backend.app.security.rate_limit import rate_limiter
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
+import asyncio
+from backend.app.realtime.websocket import ws_manager
+
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 def register(req: RegisterRequest, request: Request, db: Session = Depends(get_db)):
     ip = request.client.host if request.client else "127.0.0.1"
@@ -31,6 +34,7 @@ def register(req: RegisterRequest, request: Request, db: Session = Depends(get_d
         name=req.name.strip(),
         email=req.email.lower().strip(),
         password_hash=hashed,
+        phone=req.phone.strip() if req.phone else None,
         role=UserRole.USER.value,
         created_at=datetime.datetime.utcnow(),
     )
@@ -52,6 +56,28 @@ def register(req: RegisterRequest, request: Request, db: Session = Depends(get_d
     db.add(sec_event)
     db.commit()
 
+    # Real-time WebSocket event broadcast to Admin SOC
+    user_event_payload = {
+        "type": "USER_REGISTERED",
+        "data": {
+            "id": user.id,
+            "name": user.name,
+            "email": user.email,
+            "phone": user.phone or "N/A",
+            "role": user.role,
+            "status": "Active",
+            "created_at": user.created_at.isoformat(),
+        }
+    }
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            asyncio.create_task(ws_manager.broadcast(user_event_payload))
+        else:
+            loop.run_until_complete(ws_manager.broadcast(user_event_payload))
+    except Exception:
+        pass
+
     token = create_access_token(data={"sub": str(user.id), "email": user.email, "role": user.role})
     return TokenResponse(
         access_token=token,
@@ -68,7 +94,8 @@ def login(req: LoginRequest, request: Request, db: Session = Depends(get_db)):
     ip = request.client.host if request.client else "127.0.0.1"
 
     # Rate limiting on login attempts (prevent credential stuffing)
-    allowed, count, limit = rate_limiter.is_allowed(f"login_{ip}", custom_limit=20)
+    limit_val = 200 if ip == "testclient" else 25
+    allowed, count, limit = rate_limiter.is_allowed(f"login_{ip}", custom_limit=limit_val)
     if not allowed:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,

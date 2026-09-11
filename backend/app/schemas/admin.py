@@ -38,20 +38,27 @@ class PaymentSecurityStats(BaseModel):
 
 class AdminOverviewStats(BaseModel):
     total_users: int
+    new_users_today: int = 0
     total_api_requests: int
     normal_events: int
     suspicious_events: int
     high_risk_events: int
     critical_events: int
     payment_events: int
+    successful_payments: int = 0
+    pending_payments: int = 0
+    failed_payments: int = 0
+    payment_security_alerts: int = 0
     active_threats_count: int
     average_system_risk: float
     gnn_status: str
     ml_status: str
     recent_threats: List[ThreatResponse]
+    recent_registrations: List[Dict[str, Any]] = []
     traffic_trend: List[TrafficTrendPoint]
     risk_distribution: Dict[str, int]
     top_anomalous_endpoints: List[EndpointTelemetry]
+
 
 
 class ModelEvaluationResult(BaseModel):

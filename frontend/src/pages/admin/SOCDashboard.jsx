@@ -109,24 +109,54 @@ export const SOCDashboard = () => {
         </div>
       </div>
 
-      {/* Metric Cards Grid (Section 26: Total Users, Total API Requests, Normal, Suspicious, High Risk, Critical, Payments) */}
-      <div className="grid-4" style={{ marginBottom: '1.75rem' }}>
+      {/* Metric Cards Grid - All Database-Backed Real KPIs */}
+      <div className="grid-4" style={{ marginBottom: '1.25rem' }}>
+        <div className="metric-card">
+          <div className="metric-title">Total Users</div>
+          <div className="metric-value" style={{ color: '#0066ff' }}>{stats?.total_users || 0}</div>
+          <div className="metric-subtitle">
+            <span style={{ color: '#059669', fontWeight: '700' }}>+{stats?.new_users_today || 0} registered today</span>
+          </div>
+        </div>
+
         <div className="metric-card cyan">
           <div className="metric-title">Total API Requests</div>
           <div className="metric-value">{stats?.total_api_requests || 0}</div>
           <div className="metric-subtitle">Audit telemetry logs captured</div>
         </div>
 
-        <div className="metric-card danger">
-          <div className="metric-title" style={{ color: '#e11d48' }}>Active High/Crit Threats</div>
-          <div className="metric-value" style={{ color: '#e11d48' }}>{stats?.active_threats_count || 0}</div>
-          <div className="metric-subtitle">Requiring SOC analyst intervention</div>
+        <div className="metric-card success">
+          <div className="metric-title" style={{ color: '#059669' }}>Successful Payments</div>
+          <div className="metric-value" style={{ color: '#059669' }}>{stats?.successful_payments || 0}</div>
+          <div className="metric-subtitle">Verified & completed</div>
         </div>
 
         <div className="metric-card warning">
-          <div className="metric-title" style={{ color: '#d97706' }}>UPI Payment Events</div>
-          <div className="metric-value" style={{ color: '#d97706' }}>{stats?.payment_events || 0}</div>
-          <div className="metric-subtitle">Indian market transactions (₹)</div>
+          <div className="metric-title" style={{ color: '#d97706' }}>Pending / Held Payments</div>
+          <div className="metric-value" style={{ color: '#d97706' }}>{stats?.pending_payments || 0}</div>
+          <div className="metric-subtitle">Awaiting verification challenge</div>
+        </div>
+      </div>
+
+      <div className="grid-4" style={{ marginBottom: '1.75rem' }}>
+        <div className="metric-card danger">
+          <div className="metric-title" style={{ color: '#e11d48' }}>Failed Payments</div>
+          <div className="metric-value" style={{ color: '#e11d48' }}>{stats?.failed_payments || 0}</div>
+          <div className="metric-subtitle">Rejected or failed verification</div>
+        </div>
+
+        <div className="metric-card warning">
+          <div className="metric-title" style={{ color: '#d97706' }}>Payment Security Alerts</div>
+          <div className="metric-value" style={{ color: '#d97706' }}>{stats?.payment_security_alerts || 0}</div>
+          <div className="metric-subtitle">Threats on payment endpoints</div>
+        </div>
+
+        <div className="metric-card danger">
+          <div className="metric-title" style={{ color: '#be123c' }}>High / Critical Risk Events</div>
+          <div className="metric-value" style={{ color: '#be123c' }}>
+            {(stats?.high_risk_events || 0) + (stats?.critical_events || 0)}
+          </div>
+          <div className="metric-subtitle">Critical anomaly threshold hits</div>
         </div>
 
         <div className="metric-card success">
@@ -171,8 +201,8 @@ export const SOCDashboard = () => {
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                 <span className="badge badge-critical">🔴 {stats.recent_threats[0].risk_level} RISK THREAT</span>
-                <span style={{ fontSize: '0.85rem', fontWeight: '800', color: '#0f172a' }}>
-                  User #{stats.recent_threats[0].user_id || 'Anonymous'}
+                <span style={{ fontSize: '0.9rem', fontWeight: '800', color: '#0f172a' }}>
+                  {stats.recent_threats[0].user?.name || (stats.recent_threats[0].user_id ? `User #${stats.recent_threats[0].user_id}` : 'Anonymous User')}
                 </span>
                 <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
                   Target: <strong style={{ color: '#0066ff' }}>{stats.recent_threats[0].endpoint}</strong>
@@ -291,6 +321,7 @@ export const SOCDashboard = () => {
               <table className="custom-table" style={{ background: '#ffffff' }}>
                 <thead>
                   <tr>
+                    <th style={{ background: '#f8fafc', color: '#475569' }}>User Identity</th>
                     <th style={{ background: '#f8fafc', color: '#475569' }}>Endpoint</th>
                     <th style={{ background: '#f8fafc', color: '#475569' }}>Threat Classification</th>
                     <th style={{ background: '#f8fafc', color: '#475569' }}>Risk Level</th>
@@ -302,6 +333,9 @@ export const SOCDashboard = () => {
                 <tbody>
                   {stats.recent_threats.map((t) => (
                     <tr key={t.id}>
+                      <td style={{ fontWeight: '700', color: '#0f172a', fontSize: '0.85rem' }}>
+                        {t.user?.name || (t.user_id ? `User #${t.user_id}` : 'Anonymous User')}
+                      </td>
                       <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem', color: '#0066ff', fontWeight: '700' }}>
                         {t.endpoint}
                       </td>
@@ -362,6 +396,83 @@ export const SOCDashboard = () => {
             ))}
           </div>
         </div>
+      </div>
+
+      {/* Recent User Registrations Section (Sections 4 & 52) */}
+      <div className="card" style={{ marginTop: '1.75rem', background: '#ffffff', borderColor: '#e2e8f0', boxShadow: '0 4px 12px rgba(15,23,42,0.04)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+          <div>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: '800', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Users size={18} color="#0066ff" />
+              <span>Recent User Registrations</span>
+            </h3>
+            <p style={{ color: '#64748b', fontSize: '0.8rem', marginTop: '0.15rem' }}>
+              Real-time database user creation telemetry linked to SOC monitoring
+            </p>
+          </div>
+          <Link to="/admin/users" style={{ fontSize: '0.85rem', color: '#0066ff', fontWeight: '700' }}>
+            All Users ({stats?.total_users || 0}) →
+          </Link>
+        </div>
+
+        {(!stats?.recent_registrations || stats.recent_registrations.length === 0) ? (
+          <div style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>
+            No recent user registrations recorded in the database.
+          </div>
+        ) : (
+          <div className="table-responsive">
+            <table className="custom-table" style={{ background: '#ffffff' }}>
+              <thead>
+                <tr>
+                  <th style={{ background: '#f8fafc', color: '#475569' }}>User Name</th>
+                  <th style={{ background: '#f8fafc', color: '#475569' }}>Email</th>
+                  <th style={{ background: '#f8fafc', color: '#475569' }}>Phone</th>
+                  <th style={{ background: '#f8fafc', color: '#475569' }}>Registration Date & Time</th>
+                  <th style={{ background: '#f8fafc', color: '#475569' }}>Role</th>
+                  <th style={{ background: '#f8fafc', color: '#475569' }}>Status</th>
+                  <th style={{ background: '#f8fafc', color: '#475569' }}>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stats.recent_registrations.map((u) => (
+                  <tr key={u.id}>
+                    <td style={{ fontWeight: '700', color: '#0f172a' }}>
+                      {u.name}
+                    </td>
+                    <td style={{ color: '#475569' }}>
+                      {u.email}
+                    </td>
+                    <td style={{ color: '#64748b', fontSize: '0.85rem' }}>
+                      {u.phone || 'N/A'}
+                    </td>
+                    <td style={{ color: '#64748b', fontSize: '0.8rem' }}>
+                      {new Date(u.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}, {new Date(u.created_at).toLocaleTimeString()}
+                    </td>
+                    <td>
+                      <span className="badge" style={{ background: u.role === 'ADMIN' ? '#eff6ff' : '#f1f5f9', color: u.role === 'ADMIN' ? '#0066ff' : '#475569', fontWeight: '700' }}>
+                        {u.role}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="badge" style={{ background: u.status === 'Active' ? '#ecfdf5' : '#fff1f2', color: u.status === 'Active' ? '#059669' : '#e11d48', fontWeight: '700' }}>
+                        ● {u.status}
+                      </span>
+                    </td>
+                    <td>
+                      <Link
+                        to={`/admin/users/${u.id}`}
+                        className="btn btn-secondary btn-sm"
+                        style={{ padding: '0.2rem 0.6rem', fontSize: '0.75rem', background: '#ffffff', borderColor: '#e2e8f0', color: '#0066ff' }}
+                      >
+                        Profile
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
