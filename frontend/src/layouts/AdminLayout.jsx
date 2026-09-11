@@ -21,13 +21,13 @@ import { useRealtime } from '../hooks/useRealtime';
 import { ThreatAlertBanner } from '../components/ThreatAlertBanner';
 
 export const AdminLayout = () => {
-  const { user, logout, isAdmin } = useAuth();
+  const { adminUser, user, logoutAdmin } = useAuth();
   const navigate = useNavigate();
   const { latestThreat, clearLatestThreat, isConnected } = useRealtime();
 
   const handleLogout = () => {
-    logout();
-    navigate('/login');
+    logoutAdmin();
+    navigate('/admin/login');
   };
 
   return (
@@ -134,7 +134,7 @@ export const AdminLayout = () => {
 
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '0.75rem', borderTop: '1px solid #e2e8f0' }}>
             <div style={{ fontSize: '0.8125rem', color: '#0f172a', fontWeight: '700' }}>
-              {user ? user.name.split(' ')[0] : 'Admin'}
+              {(adminUser || user) ? (adminUser || user).name.split(' ')[0] : 'Admin'}
             </div>
             <button
               onClick={handleLogout}

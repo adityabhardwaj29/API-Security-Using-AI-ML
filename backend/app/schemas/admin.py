@@ -12,15 +12,20 @@ class TrafficTrendPoint(BaseModel):
 
 
 class EndpointTelemetry(BaseModel):
-    endpoint: str
-    method: str
-    total_calls: int
-    error_count: int
-    error_rate: float
-    avg_latency_ms: float
-    p95_latency_ms: float
-    unique_users_count: int
-    anomalous_events_count: int
+    endpoint: str = "/api"
+    method: str = "ALL"
+    total_calls: int = 0
+    requests: int = 0
+    errors: int = 0
+    error_count: int = 0
+    error_rate: float = 0.0
+    avg_latency: float = 40.0
+    avg_latency_ms: float = 40.0
+    p95_latency_ms: float = 60.0
+    unique_users: int = 1
+    unique_users_count: int = 1
+    risk_score: float = 0.1
+    anomalous_events_count: int = 0
 
 
 class PaymentSecurityStats(BaseModel):

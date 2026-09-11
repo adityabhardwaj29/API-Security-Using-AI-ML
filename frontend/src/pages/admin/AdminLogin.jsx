@@ -9,7 +9,7 @@ export const AdminLogin = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const { login } = useAuth();
+  const { adminLogin } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -17,14 +17,14 @@ export const AdminLogin = () => {
     setError('');
     setLoading(true);
     try {
-      const user = await login(email, password);
-      if (user.role !== 'ADMIN') {
+      const admin = await adminLogin(email, password);
+      if (admin.role !== 'ADMIN') {
         setError('Access denied: Account does not possess Administrator privileges.');
         return;
       }
       navigate('/admin/dashboard');
     } catch (err) {
-      setError(err.response?.data?.detail || 'Authentication failed. Please verify admin credentials.');
+      setError(err.response?.data?.detail || err.message || 'Authentication failed. Please verify admin credentials.');
     } finally {
       setLoading(false);
     }

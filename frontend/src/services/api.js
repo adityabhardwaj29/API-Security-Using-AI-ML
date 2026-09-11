@@ -9,7 +9,16 @@ const api = axios.create({
 
 // Request interceptor to attach JWT Authorization Bearer
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
+  const isAdminEndpoint = config.url && (config.url.startsWith('/admin') || config.url.startsWith('admin'));
+  const isAdminPath = typeof window !== 'undefined' && window.location && window.location.pathname.startsWith('/admin');
+
+  let token = null;
+  if (isAdminEndpoint || isAdminPath) {
+    token = localStorage.getItem('admin_token') || localStorage.getItem('token');
+  } else {
+    token = localStorage.getItem('user_token') || localStorage.getItem('token');
+  }
+
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }

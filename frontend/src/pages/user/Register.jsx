@@ -6,6 +6,7 @@ import { useAuth } from '../../hooks/useAuth';
 export const Register = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
@@ -29,8 +30,8 @@ export const Register = () => {
 
     setLoading(true);
     try {
-      await register(name, email, password);
-      navigate('/dashboard');
+      await register(name, email, password, phone);
+      navigate('/products');
     } catch (err) {
       setError(err.response?.data?.detail || 'Registration failed. Email may already be registered.');
     } finally {
@@ -102,6 +103,17 @@ export const Register = () => {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="name@example.com"
               required
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Phone Number (Optional)</label>
+            <input
+              type="tel"
+              className="form-input"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="+91 98765 43210"
             />
           </div>
 

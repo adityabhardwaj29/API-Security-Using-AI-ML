@@ -38,25 +38,26 @@ import { AdminSettings } from './pages/admin/AdminSettings';
 
 // Route Guards
 const ProtectedUserRoute = ({ children }) => {
-  const { user, loading } = useAuth();
+  const { user, userToken, loading } = useAuth();
   const location = useLocation();
 
   if (loading) {
     return <div style={{ textAlign: 'center', padding: '5rem', color: '#94a3b8' }}>Verifying security session...</div>;
   }
-  if (!user) {
+  if (!user && !userToken) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
   return children;
 };
 
 const ProtectedAdminRoute = ({ children }) => {
-  const { user, loading, isAdmin } = useAuth();
+  const { adminUser, adminToken, user, loading, isAdmin } = useAuth();
 
   if (loading) {
     return <div style={{ textAlign: 'center', padding: '5rem', color: '#94a3b8' }}>Verifying SOC credentials...</div>;
   }
-  if (!user || !isAdmin) {
+  const hasAdminAccess = adminUser?.role === 'ADMIN' || (adminToken && isAdmin) || user?.role === 'ADMIN';
+  if (!hasAdminAccess) {
     return <Navigate to="/admin/login" replace />;
   }
   return children;
